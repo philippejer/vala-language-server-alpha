@@ -80,85 +80,85 @@ class Server
     server.accept_io_stream(ios);
 
     server.notification.connect((client, method, @params) =>
+    {
+      if (logdebug) debug(@"Notification received, method ($(method)), params ($(params.print (true)))");
+      try
       {
-        if (logdebug) debug(@"Notification received, method ($(method)), params ($(params.print (true)))");
-        try
+        switch (method)
         {
-          switch (method)
-          {
-          case "textDocument/didOpen":
-            on_textDocument_didOpen(client, @params);
-            break;
-          case "textDocument/didChange":
-            on_textDocument_didChange(client, @params);
-            break;
-          case "exit":
-            on_exit(client, @params);
-            break;
-          default:
-            if (loginfo) info(@"No notification handler for method ($(method))");
-            break;
-          }
+        case "textDocument/didOpen":
+          on_textDocument_didOpen(client, @params);
+          break;
+        case "textDocument/didChange":
+          on_textDocument_didChange(client, @params);
+          break;
+        case "exit":
+          on_exit(client, @params);
+          break;
+        default:
+          if (loginfo) info(@"No notification handler for method ($(method))");
+          break;
         }
-        catch (Error err)
-        {
-          error(@"Uncaught error ($(err.message)))");
-        }
-      });
+      }
+      catch (Error err)
+      {
+        error(@"Uncaught error ($(err.message)))");
+      }
+    });
 
     server.handle_call.connect((client, method, id, @params) =>
+    {
+      if (logdebug) debug(@"Call received, method ($(method)), params ($(params.print (true)))");
+      try
       {
-        if (logdebug) debug(@"Call received, method ($(method)), params ($(params.print (true)))");
-        try
+        switch (method)
         {
-          switch (method)
-          {
-          case "initialize":
-            on_initialize(client, method, id, @params);
-            return true;
-          case "shutdown":
-            on_shutdown(client, method, id, @params);
-            return true;
-          case "textDocument/definition":
-            on_textDocument_definition(client, method, id, @params);
-            return true;
-          case "textDocument/hover":
-            on_textDocument_hover(client, method, id, @params);
-            return true;
-          case "textDocument/completion":
-            on_textDocument_completion(client, method, id, @params);
-            return true;
-          case "textDocument/signatureHelp":
-            on_textDocument_signatureHelp(client, method, id, @params);
-            return true;
-          case "textDocument/references":
-            on_textDocument_references(client, method, id, @params);
-            return true;
-          case "textDocument/prepareRename":
-            on_textDocument_prepareRename(client, method, id, @params);
-            return true;
-          case "textDocument/rename":
-            on_textDocument_rename(client, method, id, @params);
-            return true;
-          case "textDocument/documentSymbol":
-            on_textDocument_documentSymbol(client, method, id, @params);
-            return true;
-          default:
-            if (loginfo) info(@"No call handler for method ($(method))");
-            return false;
-          }
+        case "initialize":
+          on_initialize(client, method, id, @params);
+          return true;
+        case "shutdown":
+          on_shutdown(client, method, id, @params);
+          return true;
+        case "textDocument/definition":
+          on_textDocument_definition(client, method, id, @params);
+          return true;
+        case "textDocument/hover":
+          on_textDocument_hover(client, method, id, @params);
+          return true;
+        case "textDocument/completion":
+          on_textDocument_completion(client, method, id, @params);
+          return true;
+        case "textDocument/signatureHelp":
+          on_textDocument_signatureHelp(client, method, id, @params);
+          return true;
+        case "textDocument/references":
+          on_textDocument_references(client, method, id, @params);
+          return true;
+        case "textDocument/prepareRename":
+          on_textDocument_prepareRename(client, method, id, @params);
+          return true;
+        case "textDocument/rename":
+          on_textDocument_rename(client, method, id, @params);
+          return true;
+        case "textDocument/documentSymbol":
+          on_textDocument_documentSymbol(client, method, id, @params);
+          return true;
+        default:
+          if (loginfo) info(@"No call handler for method ($(method))");
+          return false;
         }
-        catch (Error err)
-        {
-          error(@"Uncaught error ($(err.message)))");
-        }
-      });
+      }
+      catch (Error err)
+      {
+        error(@"Uncaught error ($(err.message)))");
+      }
+    });
 
     Timeout.add(check_diagnostics_period_ms, () =>
-      {
-        check_publishDiagnostics();
-        return true;
-      });
+    {
+      check_publishDiagnostics();
+      return true;
+    });
   }
 
   private void on_initialize(Jsonrpc.Client client, string method, Variant id, Variant @params)
@@ -185,10 +185,10 @@ class Server
 
     // Analyze again when the file changes
     monitor_file(ninja_file, false, () => {
-        if (loginfo) info("Build file has changed, reanalyzing...");
-        reanalyze_meson_build(client, root_path, build_dir);
-        request_publishDiagnostics(client);
-      });
+      if (loginfo) info("Build file has changed, reanalyzing...");
+      reanalyze_meson_build(client, root_path, build_dir);
+      request_publishDiagnostics(client);
+    });
 
     try
     {
@@ -237,23 +237,23 @@ class Server
     time_t last_file_time = init_file_time;
     time_t last_action_time = init_file_time;
     Timeout.add(monitor_file_period_ms, () =>
+    {
+      time_t file_time = get_file_time(file);
+      if (last_action_time < file_time)
       {
-        time_t file_time = get_file_time(file);
-        if (last_action_time < file_time)
+        if (when_stable && last_file_time != file_time)
         {
-          if (when_stable && last_file_time != file_time)
-          {
-            if (loginfo) info(@"File ($(file)) has changed, will trigger when stable...");
-          }
-          else
-          {
-            last_action_time = file_time;
-            action();
-          }
+          if (loginfo) info(@"File ($(file)) has changed, will trigger when stable...");
         }
-        last_file_time = file_time;
-        return true;
-      });
+        else
+        {
+          last_action_time = file_time;
+          action();
+        }
+      }
+      last_file_time = file_time;
+      return true;
+    });
   }
 
   private time_t get_file_time(string file)
@@ -310,121 +310,121 @@ class Server
     if (loginfo) info(@"targets ($(Json.to_string (targets_node, true)))");
     Json.Array targets_array = targets_node.get_array();
     targets_array.foreach_element((array, index, target_node) =>
+    {
+      Json.Object target_object = target_node.get_object();
+      string target_name = target_object.get_string_member("name");
+      string target_type = target_object.get_string_member("type");
+      if (loginfo) info(@"target ($(target_name)) ($(target_type))");
+
+      Json.Array target_sources_array = target_object.get_array_member("target_sources");
+      target_sources_array.foreach_element((array, index, target_source_node) =>
       {
-        Json.Object target_object = target_node.get_object();
-        string target_name = target_object.get_string_member("name");
-        string target_type = target_object.get_string_member("type");
-        if (loginfo) info(@"target ($(target_name)) ($(target_type))");
 
-        Json.Array target_sources_array = target_object.get_array_member("target_sources");
-        target_sources_array.foreach_element((array, index, target_source_node) =>
+        Json.Object target_source_object = target_source_node.get_object();
+
+        string language = target_source_object.get_string_member("language");
+        if (language != "vala")
         {
+          return;
+        }
 
-          Json.Object target_source_object = target_source_node.get_object();
-
-          string language = target_source_object.get_string_member("language");
-          if (language != "vala")
+        if (target_source_object.has_member("parameters"))
+        {
+          Json.Array parameters_array = target_source_object.get_array_member("parameters");
+          string[] parameters = new string[parameters_array.get_length()];
+          parameters_array.foreach_element((array, index, parameter_node) =>
           {
-            return;
+            parameters[index] = parameter_node.get_string();
+          });
+
+          MatchInfo match_info;
+          string command_parameters = string.joinv(" ", parameters);
+          if (loginfo) info(@"Command parameters ($(command_parameters))");
+          if (package_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            do
+            {
+              string package = match_info.fetch(1);
+              if (loginfo) info(@"Adding package ($(package))");
+              context.add_package(package);
+            }
+            while (match_info.next());
           }
-
-          if (target_source_object.has_member("parameters"))
+          if (vapidir_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
           {
-            Json.Array parameters_array = target_source_object.get_array_member("parameters");
-            string[] parameters = new string[parameters_array.get_length()];
-            parameters_array.foreach_element((array, index, parameter_node) =>
+            do
             {
-              parameters[index] = parameter_node.get_string();
-            });
-
-            MatchInfo match_info;
-            string command_parameters = string.joinv(" ", parameters);
-            if (loginfo) info(@"Command parameters ($(command_parameters))");
-            if (package_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              do
-              {
-                string package = match_info.fetch(1);
-                if (loginfo) info(@"Adding package ($(package))");
-                context.add_package(package);
-              }
-              while (match_info.next());
+              string vapi_directory = match_info.fetch(1);
+              if (loginfo) info(@"Adding vapi directory ($(vapi_directory))");
+              context.add_vapi_directory(vapi_directory);
             }
-            if (vapidir_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+            while (match_info.next());
+          }
+          if (define_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            do
             {
-              do
-              {
-                string vapi_directory = match_info.fetch(1);
-                if (loginfo) info(@"Adding vapi directory ($(vapi_directory))");
-                context.add_vapi_directory(vapi_directory);
-              }
-              while (match_info.next());
+              string define = match_info.fetch(1);
+              if (loginfo) info(@"Adding define ($(define))");
+              context.add_define(define);
             }
-            if (define_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              do
-              {
-                string define = match_info.fetch(1);
-                if (loginfo) info(@"Adding define ($(define))");
-                context.add_define(define);
-              }
-              while (match_info.next());
-            }
-            if (disable_warnings_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting disable warnings flag");
-              context.disable_warnings = true;
-            }
+            while (match_info.next());
+          }
+          if (disable_warnings_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            if (loginfo) info("Setting disable warnings flag");
+            context.disable_warnings = true;
+          }
 #if LIBVALA_EXPERIMENTAL
-            if (exp_public_by_default_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting public by default flag");
-              context.exp_public_by_default = true;
-            }
-            if (exp_float_by_default_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting float by default flag");
-              context.exp_float_by_default = true;
-            }
-            if (exp_optional_semicolons_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting optional semicolons flag");
-              context.exp_optional_semicolons = true;
-            }
-            if (exp_optional_parens_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting optional parens flag");
-              context.exp_optional_parens = true;
-            }
-            if (exp_conditional_attribute_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting conditional attribute flag");
-              context.exp_conditional_attribute = true;
-            }
-#endif
-          }
-
-          if (target_source_object.has_member("sources"))
+          if (exp_public_by_default_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
           {
-            Json.Array sources_array = target_source_object.get_array_member("sources");
-            sources_array.foreach_element((array, index, source_node) =>
-            {
-              string anotherfilename = source_node.get_string();
-              if (!Path.is_absolute(anotherfilename))
-              {
-                anotherfilename = Path.build_filename(rootdir, anotherfilename);
-              }
-              if (is_source_file(anotherfilename))
-              {
-                string uri = sanitize_file_uri(Filename.to_uri(anotherfilename));
-                if (loginfo) info(@"Adding source file ($(anotherfilename)) ($(uri))");
-                var my_source_file = new SourceFile.from_internal(anotherfilename, uri);
-                context.add_source_file(my_source_file);
-              }
-            });
+            if (loginfo) info("Setting public by default flag");
+            context.exp_public_by_default = true;
           }
-        });
+          if (exp_float_by_default_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            if (loginfo) info("Setting float by default flag");
+            context.exp_float_by_default = true;
+          }
+          if (exp_optional_semicolons_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            if (loginfo) info("Setting optional semicolons flag");
+            context.exp_optional_semicolons = true;
+          }
+          if (exp_optional_parens_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            if (loginfo) info("Setting optional parens flag");
+            context.exp_optional_parens = true;
+          }
+          if (exp_conditional_attribute_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
+          {
+            if (loginfo) info("Setting conditional attribute flag");
+            context.exp_conditional_attribute = true;
+          }
+#endif
+        }
+
+        if (target_source_object.has_member("sources"))
+        {
+          Json.Array sources_array = target_source_object.get_array_member("sources");
+          sources_array.foreach_element((array, index, source_node) =>
+          {
+            string anotherfilename = source_node.get_string();
+            if (!Path.is_absolute(anotherfilename))
+            {
+              anotherfilename = Path.build_filename(rootdir, anotherfilename);
+            }
+            if (is_source_file(anotherfilename))
+            {
+              string uri = sanitize_file_uri(Filename.to_uri(anotherfilename));
+              if (loginfo) info(@"Adding source file ($(anotherfilename)) ($(uri))");
+              var my_source_file = new SourceFile.from_internal(anotherfilename, uri);
+              context.add_source_file(my_source_file);
+            }
+          });
+        }
       });
+    });
   }
 
   private void on_textDocument_didOpen(Jsonrpc.Client client, Variant @params)
@@ -689,7 +689,7 @@ class Server
     }
 
     string completion_member;
-    Gee.Map<string, Vala.Symbol>? symbols = get_completion_symbols(source_file, position.line, position.character, out completion_member);
+    Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(source_file, position.line, position.character, out completion_member);
     if (symbols == null)
     {
       return null;
@@ -699,22 +699,17 @@ class Server
     completion_list.isIncomplete = false;
     var completion_items = new JsonArrayList<CompletionItem>();
     completion_list.items = completion_items;
-    Gee.MapIterator<string, Vala.Symbol> iter = symbols.map_iterator();
+    Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
     for (bool has_next = iter.next(); has_next; has_next = iter.next())
     {
       string name = iter.get_key();
-      Vala.Symbol symbol = iter.get_value();
+      OrderedSymbol ordered_symbol = iter.get_value();
+      Vala.Symbol symbol = ordered_symbol.symbol;
       string code = get_symbol_definition_code(symbol);
       var completion_item = new CompletionItem();
-      if (symbol.parent_symbol.name == "Object")
-      {
-        completion_item.label = "~-" + name;
-      }
-      else
-      {
-        completion_item.label = name;
-      }
+      completion_item.label = name;
       completion_item.detail = code;
+      completion_item.sortText = "%03d:%s".printf(ordered_symbol.order, code);
       completion_item.insertText = name;
       completion_item.insertTextFormat = InsertTextFormat.PlainText;
       if (symbol is Vala.Field)
@@ -816,20 +811,21 @@ class Server
     }
 
     string completion_member;
-    Gee.Map<string, Vala.Symbol>? symbols = get_completion_symbols(source_file, line, character, out completion_member);
+    Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(source_file, line, character, out completion_member);
 
     if (symbols == null)
     {
       return null;
     }
 
-    Vala.Symbol? completion_symbol = symbols.get(completion_member);
-    if (completion_symbol == null)
+    OrderedSymbol? ordered_symbol = symbols.get(completion_member);
+    if (ordered_symbol == null)
     {
       warning(@"Completion member is not in the completion symbols ($(completion_member))");
       return null;
     }
 
+    Vala.Symbol completion_symbol = ordered_symbol.symbol;
     Vala.Method? completion_method = completion_symbol as Vala.Method;
     if (completion_method == null)
     {
@@ -853,7 +849,7 @@ class Server
 
   private bool completion_pending = false;
 
-  private Gee.Map<string, Vala.Symbol>? get_completion_symbols(SourceFile source_file, uint line, uint character, out string completion_member)
+  private Gee.Map<string, OrderedSymbol>? get_completion_symbols(SourceFile source_file, uint line, uint character, out string completion_member)
   {
     string current_source = source_file.content;
     try
@@ -879,15 +875,7 @@ class Server
       source_file.content = source_file.content.splice(start_index, start_index, insert_str);
 
       context.check();
-      Gee.Map<string, Vala.Symbol>? symbols = handle_completion_aux(source_file, out completion_member);
-      if (symbols != null)
-      {
-        return symbols;
-      }
-      else
-      {
-        return null;
-      }
+      return handle_completion_aux(source_file, out completion_member);
     }
     finally
     {
@@ -954,7 +942,7 @@ class Server
     return source.slice(current + 1, index).strip();
   }
 
-  private Gee.Map<string, Vala.Symbol>? handle_completion_aux(SourceFile source_file, out string completion_member)
+  private Gee.Map<string, OrderedSymbol>? handle_completion_aux(SourceFile source_file, out string completion_member)
   {
     Vala.Symbol? completion_symbol = find_symbol_by_name(source_file.file, completion_symbol_name);
     if (completion_symbol == null)
@@ -992,7 +980,7 @@ class Server
     Vala.Expression? completion_inner = completion_initializer.inner;
     if (completion_inner == null)
     {
-      Gee.Map<string, Vala.Symbol> global_symbols = get_global_symbols(completion_variable, SymbolFlags.ALL);
+      Gee.Map<string, OrderedSymbol> global_symbols = get_global_symbols(completion_variable, SymbolFlags.ALL);
       if (completion_member != completion_wildcard_name)
       {
         filter_completion_symbols(global_symbols, completion_member);
@@ -1062,10 +1050,10 @@ class Server
     return iterator.get();
   }
 
-  private void filter_completion_symbols(Gee.Map<string, Vala.Symbol> symbols, string name)
+  private void filter_completion_symbols(Gee.Map<string, OrderedSymbol> symbols, string name)
   {
     string name_down = name.down();
-    Gee.MapIterator<string, Vala.Symbol> iter = symbols.map_iterator();
+    Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
     for (bool has_next = iter.next(); has_next; has_next = iter.next())
     {
       string symbol_name = iter.get_key();

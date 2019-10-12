@@ -116,12 +116,12 @@ string symbol_scope_to_string(Vala.Symbol parent_symbol, SymbolFlags flags = Sym
   var builder = new StringBuilder();
   builder.append("(");
   bool first = true;
-  Gee.Map<string, Vala.Symbol> table = get_extended_symbols(parent_symbol, flags);
-  Gee.MapIterator<string, Vala.Symbol> iter = table.map_iterator();
+  Gee.Map<string, OrderedSymbol> table = get_extended_symbols(parent_symbol, flags);
+  Gee.MapIterator<string, OrderedSymbol> iter = table.map_iterator();
   for (bool has_next = iter.next(); has_next; has_next = iter.next())
   {
     string name = iter.get_key();
-    Vala.Symbol symbol = iter.get_value();
+    Vala.Symbol symbol = iter.get_value().symbol;
     if (first)
     {
       first = false;
@@ -163,7 +163,7 @@ string symbol_scope_to_string(Vala.Symbol parent_symbol, SymbolFlags flags = Sym
 }
 
 [Flags]
-enum SymbolFlags
+public enum SymbolFlags
 {
   NONE = 0,
   INSTANCE,
@@ -173,10 +173,16 @@ enum SymbolFlags
   ALL = INSTANCE | INTERNAL | PROTECTED | PRIVATE
 }
 
-Gee.Map<string, Vala.Symbol> get_global_symbols(Vala.CodeNode node, SymbolFlags flags = SymbolFlags.ALL)
+public class OrderedSymbol
 {
-  var symbols = new Gee.TreeMap<string, Vala.Symbol>();
-  add_global_symbols(symbols, node, flags);
+  public Vala.Symbol symbol { get; set; }
+  public int order { get; set; }
+}
+
+Gee.Map<string, OrderedSymbol> get_global_symbols(Vala.CodeNode node, SymbolFlags flags = SymbolFlags.ALL)
+{
+  var symbols = new Gee.TreeMap<string, OrderedSymbol>();
+  add_global_symbols(symbols, node, flags, 0);
   if (node.source_reference != null && node.source_reference.using_directives != null)
   {
     foreach (Vala.UsingDirective using_directive in node.source_reference.using_directives)
@@ -184,51 +190,51 @@ Gee.Map<string, Vala.Symbol> get_global_symbols(Vala.CodeNode node, SymbolFlags 
       if (using_directive.namespace_symbol != null)
       {
         if (logdebug) debug(@"Add symbols for using directive ($(using_directive.namespace_symbol.name))");
-        add_scope_symbols(using_directive.namespace_symbol, symbols, flags);
+        add_scope_symbols(using_directive.namespace_symbol, symbols, flags, 1000);
       }
     }
   }
   return symbols;
 }
 
-void add_global_symbols(Gee.Map<string, Vala.Symbol> symbols, Vala.CodeNode node, SymbolFlags flags = SymbolFlags.ALL)
+void add_global_symbols(Gee.Map<string, OrderedSymbol> symbols, Vala.CodeNode node, SymbolFlags flags, int order)
 {
   Vala.Symbol? symbol = node as Vala.Symbol;
   if (symbol != null)
   {
-    add_scope_symbols(symbol, symbols, flags);
+    add_scope_symbols(symbol, symbols, flags, order);
     var base_types = get_base_types(symbol);
     if (base_types != null)
     {
       foreach (Vala.Symbol base_type in base_types)
       {
-        add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE);
+        add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE, order + 1);
       }
     }
   }
   Vala.CodeNode? parent_node = get_node_parent(node);
   if (parent_node != null)
   {
-    add_global_symbols(symbols, parent_node, flags);
+    add_global_symbols(symbols, parent_node, flags, order);
   }
 }
 
-Gee.Map<string, Vala.Symbol> get_extended_symbols(Vala.Symbol symbol, SymbolFlags flags = SymbolFlags.ALL)
+Gee.Map<string, OrderedSymbol> get_extended_symbols(Vala.Symbol symbol, SymbolFlags flags = SymbolFlags.ALL)
 {
-  var symbols = new Gee.TreeMap<string, Vala.Symbol>();
-  add_scope_symbols(symbol, symbols, flags);
+  var symbols = new Gee.TreeMap<string, OrderedSymbol>();
+  add_scope_symbols(symbol, symbols, flags, 0);
   var base_types = get_base_types(symbol);
   if (base_types != null)
   {
     foreach (Vala.Symbol base_type in base_types)
     {
-      add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE);
+      add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE, 1);
     }
   }
   return symbols;
 }
 
-void add_scope_symbols(Vala.Symbol parent_symbol, Gee.Map<string, Vala.Symbol> symbols, SymbolFlags flags)
+void add_scope_symbols(Vala.Symbol parent_symbol, Gee.Map<string, OrderedSymbol> symbols, SymbolFlags flags, int order)
 {
   Vala.Scope? scope = parent_symbol.scope;
   if (scope == null)
@@ -272,8 +278,10 @@ void add_scope_symbols(Vala.Symbol parent_symbol, Gee.Map<string, Vala.Symbol> s
     if (symbols.has_key(name))
     {
       continue;
-    }
-    symbols.set(name, symbol);
+    }    
+    symbols.set(name, new OrderedSymbol() {
+      symbol = symbol, order = order
+    });
   }
 }
 
@@ -424,6 +432,20 @@ string source_reference_to_string(Vala.SourceReference? source_reference)
 
 string get_symbol_definition_code(Vala.Symbol symbol)
 {
+  string definition = get_symbol_definition_source(symbol);
+
+  // Add the parent symbol name for context (hackish but simple)
+  Vala.Symbol? parent_symbol = symbol.parent_symbol;
+  if (parent_symbol != null && parent_symbol.name != null)
+  {
+    definition = @"[$(parent_symbol.name)] $(definition)";
+  }
+  
+  return definition;
+}
+
+string get_symbol_definition_source(Vala.Symbol symbol)
+{
   if (symbol is Vala.Subroutine)
   {
     return get_code_node_source_to_token(symbol, ')');
@@ -543,7 +565,7 @@ Location? get_identifier_location(Vala.CodeNode node, string identifier, bool st
     warning(@"Node has no source reference ($(code_node_to_string (node)))");
     return null;
   }
-  var location = source_reference_to_location(source_reference);
+  Location location = source_reference_to_location(source_reference);
   string source = get_code_node_source(node);
   if (!find_identifier_location(location.range, source, identifier))
   {
@@ -567,7 +589,7 @@ bool find_identifier_location(Range range, string source, string identifier)
   while (position < limit)
   {
     bool is_candidate = (position == 0 || !source[position - 1].isalnum()) && (position == (limit - 1) || !source[position + identifier_length].isalnum());
-    if (is_candidate && are_equal_strings((char*)&source.data[position], (char*)identifier, identifier_length))
+    if (is_candidate && equal_strings((char*)&source.data[position], (char*)identifier, identifier_length))
     {
       range.start.line = line;
       range.start.character = character;
@@ -589,7 +611,7 @@ bool find_identifier_location(Range range, string source, string identifier)
   return false;
 }
 
-bool are_equal_strings(char* s1, char* s2, int length)
+bool equal_strings(char* s1, char* s2, int length)
 {
   for (int i = 0; i < length; i++)
   {
