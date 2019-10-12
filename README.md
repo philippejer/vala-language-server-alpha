@@ -71,6 +71,11 @@ Quick steps on how to compile and setup everything (tested with Ubuntu 18.04)
 
 https://marketplace.visualstudio.com/items?itemName=philippejer.vala-language-client
 
+## TODOs
+
+* Comment the many and hack-ish obscure parts of the code (CodeHelpers in particular).
+* General refactoring (some parts could be decoupled).
+
 ## Background
 
 I have originally started this as a fork of this [Vala Language Server](https://github.com/benwaffle/vala-language-server) (around june 2019), which did not seem actively developped at the time. Initially I only wanted to see if I could improve on a few things but ended up adding quite a few features (and many hacks...).

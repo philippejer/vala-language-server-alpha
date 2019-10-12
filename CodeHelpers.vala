@@ -436,7 +436,7 @@ namespace VLS
   {
     string definition = get_symbol_definition_source(symbol);
 
-    // Add the parent symbol name for context (hackish but simple)
+    // Add the parent symbol name for context (hack-ish but simple)
     Vala.Symbol? parent_symbol = symbol.parent_symbol;
     if (parent_symbol != null && parent_symbol.name != null)
     {
