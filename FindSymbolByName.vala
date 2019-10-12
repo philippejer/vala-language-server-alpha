@@ -1,35 +1,38 @@
-class FindSymbolByName : FindNodeInFile
+namespace VLS
 {
-  protected string name;
-
-  public Gee.HashSet<Vala.Symbol> symbols = new Gee.HashSet<Vala.Symbol>();
-
-  public FindSymbolByName(Vala.SourceFile file, string name)
+  class FindSymbolByName : FindNodeInFile
   {
-    base(file);
-    this.name = name;
-  }
+    protected string name;
 
-  protected override void check_node(Vala.CodeNode node)
-  {
-    var source_reference = node.source_reference;
-    if (source_reference == null)
+    public Gee.HashSet<Vala.Symbol> symbols = new Gee.HashSet<Vala.Symbol>();
+
+    public FindSymbolByName(Vala.SourceFile file, string name)
     {
-      return;
-    }
-    if (source_reference.file != file)
-    {
-      return;
+      base(file);
+      this.name = name;
     }
 
-    var symbol = node as Vala.Symbol;
-
-    if (symbol == null || symbol.name != name)
+    protected override void check_node(Vala.CodeNode node)
     {
-      return;
-    }
+      var source_reference = node.source_reference;
+      if (source_reference == null)
+      {
+        return;
+      }
+      if (source_reference.file != file)
+      {
+        return;
+      }
 
-    if (loginfo) info(@"Found symbol ($(code_node_to_string (symbol))), source ($(get_code_node_source (symbol)))");
-    symbols.add(symbol);
+      var symbol = node as Vala.Symbol;
+
+      if (symbol == null || symbol.name != name)
+      {
+        return;
+      }
+
+      if (loginfo) info(@"Found symbol ($(code_node_to_string (symbol))), source ($(get_code_node_source (symbol)))");
+      symbols.add(symbol);
+    }
   }
 }

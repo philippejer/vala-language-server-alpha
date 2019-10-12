@@ -1,14 +1,17 @@
-abstract class FindNodeInFile : FindNode
+namespace VLS
 {
-  protected Vala.SourceFile file;
-
-  protected FindNodeInFile(Vala.SourceFile file)
+  abstract class FindNodeInFile : FindNode
   {
-    this.file = file;
-  }
+    protected Vala.SourceFile file;
 
-  public void find()
-  {
-    this.visit_source_file(file);
+    protected FindNodeInFile(Vala.SourceFile file)
+    {
+      this.file = file;
+    }
+
+    public void find()
+    {
+      this.visit_source_file(file);
+    }
   }
 }
