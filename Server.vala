@@ -598,7 +598,7 @@ class Server
     var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
     Vala.Symbol? symbol = find_symbol_by_position(position_params.textDocument, position_params.position);
-    if (symbol == null)
+    if (symbol == null || symbol.name == null)
     {
       client.reply(id, null);
       return;
@@ -690,7 +690,6 @@ class Server
 
     string completion_member;
     Gee.Map<string, Vala.Symbol>? symbols = get_completion_symbols(source_file, position.line, position.character, out completion_member);
-
     if (symbols == null)
     {
       return null;
@@ -1106,7 +1105,7 @@ class Server
   private JsonArrayList<Location> handle_references(ReferenceParams reference_params)
   {
     Vala.Symbol? symbol = find_symbol_by_position(reference_params.textDocument, reference_params.position);
-    if (symbol == null)
+    if (symbol == null || symbol.name == null)
     {
       warning("Cannot find symbol at position");
       return null;
@@ -1149,7 +1148,7 @@ class Server
   private Range? handle_prepareRename(TextDocumentPositionParams position_params, ref string error_message)
   {
     Vala.Symbol? symbol = find_symbol_by_position(position_params.textDocument, position_params.position);
-    if (symbol == null)
+    if (symbol == null || symbol.name == null)
     {
       warning("Cannot find symbol at position");
       error_message = "Cannot identify symbol under cursor";

@@ -84,7 +84,7 @@ string code_node_to_string(Vala.CodeNode? node)
     return "(NULL[CodeNode])";
   }
   var symbol = node as Vala.Symbol;
-  if (symbol != null)
+  if (symbol != null && symbol.name != null)
   {
     return @"$(symbol.name) ($(node.type_name)) ($(ptr_to_string (node))) ($(source_reference_to_string (node.source_reference)))";
   }
@@ -100,8 +100,8 @@ string code_scope_to_string(Vala.CodeNode? node)
   {
     return "(NULL[CodeNode])";
   }
-  var symbol = node as  Vala.Symbol;
-  if (symbol != null)
+  var symbol = node as Vala.Symbol;
+  if (symbol != null && symbol.name != null)
   {
     return @"$(symbol.name) ($(node.type_name)) ($(ptr_to_string (node))) ($(source_reference_to_string (node.source_reference))) $(symbol_scope_to_string (symbol))";
   }

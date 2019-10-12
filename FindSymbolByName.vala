@@ -17,7 +17,6 @@ class FindSymbolByName : FindNodeInFile
     {
       return;
     }
-
     if (source_reference.file != file)
     {
       return;
