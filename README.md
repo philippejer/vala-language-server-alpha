@@ -45,7 +45,7 @@ The following features work reasonably well (for my requirements anyway):
 
 Quick steps on how to compile and setup everything (tested with Ubuntu 18.04)
 
-### Install Valac
+### Compile Valac
 
 * Install required build packages
   * `sudo apt-get install build-essential cmake autoconf autoconf-archive automake libtool flex bison libgraphviz-dev libgee-0.8-dev libjsonrpc-glib-1.0-dev`
@@ -82,7 +82,7 @@ Quick steps on how to compile and setup everything (tested with Ubuntu 18.04)
 
 The general steps are quite similar with MinGW-64 (this is actually my main setup).
 
-### Install MinGW-64 and Valac
+### Install MinGW-64
 
 * Download from https://sourceforge.net/projects/msys2/files/Base/x86_64/
 * Repeat the general update until there is nothing left to update (as explained in the [MSYS2 installation Wiki](https://sourceforge.net/p/msys2/wiki/MSYS2%20installation/))
@@ -90,6 +90,11 @@ The general steps are quite similar with MinGW-64 (this is actually my main setu
 * Install some required build packages (some may not be strictly necessary for Vala)
   * `pacman -S base-devel`
   * `pacman -S vim mingw-w64-x86_64-toolchain mingw-w64-x86_64-make mingw-w64-x86_64-cmake`
+
+### Compile Valac
+
+Note: you can skip this step by installing the recently updated vala compiler (0.46.3) from the package repository (`pacman -S mingw-w64-x86_64-vala`)
+
 * Download the pre-compiled Vala sources
   * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.0.tar.xz' && tar xf vala-0.46.0.tar.xz`
 * Compile Valac
