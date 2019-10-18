@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   class SourceError
   {
@@ -26,7 +26,7 @@ namespace VLS
       }
       else if (source == null)
       {
-        GLib.warning(@"Non-source note ($(message))");
+        if (logwarn) GLib.warning(@"Non-source note ($(message))");
       }
       else
       {
@@ -42,7 +42,7 @@ namespace VLS
       }
       else if (source == null)
       {
-        GLib.warning(@"Non-source deprecation ($(message))");
+        if (logwarn) GLib.warning(@"Non-source deprecation ($(message))");
       }
       else
       {
@@ -59,7 +59,7 @@ namespace VLS
       }
       else if (source == null)
       {
-        GLib.warning(@"Non-source warning ($(message))");
+        if (logwarn) GLib.warning(@"Non-source warning ($(message))");
       }
       else
       {
@@ -78,6 +78,18 @@ namespace VLS
       {
         add_source_error(source, message, ref errors_by_file);
         ++errors;
+      }
+    }
+
+    public override void suppr_err(Vala.SourceReference? source, string message)
+    {
+      if (source == null)
+      {
+        GLib.error(@"Non-source error ($(message))");
+      }
+      else
+      {
+        add_source_error(source, message, ref errors_by_file);
       }
     }
 

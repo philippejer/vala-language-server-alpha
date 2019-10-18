@@ -1,5 +1,9 @@
-namespace VLS
+namespace Vls
 {
+  // Redefinition of Json.Serializable required because of an resolved bug in the GLib JSON-RPC library.
+  // The bug is that while the deserialized value is marked as "out" in the API the library handles it as a "ref" parameter,
+  // which causes issues because Vala will forcefully clear out parameter (unlike C code, typically).
+  // https://gitlab.gnome.org/GNOME/json-glib/issues/39
   [CCode(cname = "JsonSerializable", cprefix = "json_serializable_", cheader_filename = "json-glib/json-glib.h", type_id = "json_serializable_get_type()")]
   public interface JsonSerializableObject : GLib.Object
   {

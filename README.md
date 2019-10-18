@@ -41,9 +41,15 @@ The following features work reasonably well (for my requirements anyway):
 * Find references / symbol rename (rename support is limited, use with care)
 * Code completion (crude and hack-ish but still fairly fast and usable in common situations)
 
+## Experimental compiler branch
+
+Note that [this branch](https://gitlab.gnome.org/philippejer/vala/tree/0.46.3-exp) contains a few experimental compiler switches (disabled by default), one in particular is a small modification of the parser to enable code navigation in the presence of trivial syntax errors like a missing semicolon (by default the syntax tree is not built in the presence of syntax errors).
+
+The support of this "mode" in the compiler is detected by looking at the compiler version (see [meson.build](https://github.com/philippejer/vala-language-server-alpha/blob/master/meson.build)).
+
 ## How to compile (Ubuntu 18.04)
 
-Quick steps on how to compile and setup everything (tested with Ubuntu 18.04)
+Quick steps on how to compile and setup everything (tested with Ubuntu 18.04).
 
 ### Compile Valac
 

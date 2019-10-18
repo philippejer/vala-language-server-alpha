@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   class SourceFile : Object
   {
@@ -154,13 +154,16 @@ namespace VLS
     {
       reporter.enable_warnings = !disable_warnings;
       code_context.report = reporter;
-
+      
 #if LIBVALA_EXPERIMENTAL
       code_context.exp_public_by_default = exp_public_by_default;
       code_context.exp_float_by_default = exp_float_by_default;
       code_context.exp_optional_semicolons = exp_optional_semicolons;
       code_context.exp_optional_parens = exp_optional_parens;
       code_context.exp_conditional_attribute = exp_conditional_attribute;
+
+      // This flag allows the parser to continue on trivial syntax errors
+      code_context.exp_resilient_parser = true;
 #endif
 
       code_context.profile = Vala.Profile.GOBJECT;

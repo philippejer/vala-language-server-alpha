@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   class FindSymbolReferences : FindNode
   {
@@ -35,11 +35,11 @@ namespace VLS
       }
       found_nodes.add(node);
 
-      Vala.Symbol? symbol = get_symbol_reference(node);
+      Vala.Symbol? symbol = get_referenced_symbol(node);
 
       if ((include_target_symbol || (node != target_symbol)) && symbol == target_symbol)
       {
-        if (loginfo) info(@"Found reference ($(code_node_to_string (node)))");
+        if (loginfo) info(@"Found reference ($(code_node_to_string(node)))");
         references.add(node);
       }
     }

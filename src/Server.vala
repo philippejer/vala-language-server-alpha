@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   errordomain Error
   {
@@ -11,8 +11,6 @@ namespace VLS
     const int64 publish_diagnostics_delay_inc_us = 100 * 1000;
     const int64 publish_diagnostics_delay_max_us = 1000 * 1000;
     const int monitor_file_period_ms = 2500;
-    const string completion_symbol_name = "__completion_symbol__";
-    const string completion_wildcard_name = "__completion_wildcard__";
 
     static Regex package_regex;
     static Regex vapidir_regex;
@@ -83,7 +81,7 @@ namespace VLS
 
       server.notification.connect((client, method, @params) =>
       {
-        if (logdebug) debug(@"Notification received, method ($(method)), params ($(params.print (true)))");
+        if (logdebug) debug(@"Notification received, method ($(method)), params ($(params.print(true)))");
         try
         {
           switch (method)
@@ -110,7 +108,7 @@ namespace VLS
 
       server.handle_call.connect((client, method, id, @params) =>
       {
-        if (logdebug) debug(@"Call received, method ($(method)), params ($(params.print (true)))");
+        if (logdebug) debug(@"Call received, method ($(method)), params ($(params.print(true)))");
         try
         {
           switch (method)
@@ -186,7 +184,8 @@ namespace VLS
       reanalyze_meson_build(client, root_path, build_dir);
 
       // Analyze again when the file changes
-      monitor_file(ninja_file, false, () => {
+      monitor_file(ninja_file, false, () =>
+      {
         if (loginfo) info("Build file has changed, reanalyzing...");
         reanalyze_meson_build(client, root_path, build_dir);
         request_publishDiagnostics(client);
@@ -309,7 +308,7 @@ namespace VLS
 
       string targets_json = proc_stdout;
       Json.Node targets_node = parse_json(targets_json);
-      if (loginfo) info(@"targets ($(Json.to_string (targets_node, true)))");
+      if (logdebug) debug(@"targets ($(Json.to_string(targets_node, true)))");
       Json.Array targets_array = targets_node.get_array();
       targets_array.foreach_element((array, index, target_node) =>
       {
@@ -576,23 +575,23 @@ namespace VLS
       Vala.SourceLocation begin = error.source.begin;
       Vala.SourceLocation end = error.source.end;
       return new Diagnostic()
-             {
-               range = new Range()
-               {
-                 start = new Position()
-                 {
-                   line = begin.line - 1,
-                   character = begin.column - 1
-                 },
-                 end = new Position()
-                 {
-                   line = end.line - 1,
-                   character = end.column
-                 }
-               },
-               severity = severity,
-               message = error.message
-             };
+      {
+        range = new Range()
+        {
+          start = new Position()
+          {
+            line = begin.line - 1,
+            character = begin.column - 1
+          },
+          end = new Position()
+          {
+            line = end.line - 1,
+            character = end.column
+          }
+        },
+        severity = severity,
+        message = error.message
+      };
     }
 
     private void on_textDocument_definition(Jsonrpc.Client client, string method, Variant id, Variant @params)
@@ -627,11 +626,16 @@ namespace VLS
         return;
       }
 
-      string code = get_symbol_definition_code(symbol);
+      string code = get_symbol_definition_code_with_comment(symbol);
       if (loginfo) info(@"Found symbol definition code ($(code))");
 
       var hover = new Hover();
-      hover.contents = code;
+      hover.contents = new MarkupContent()
+      {
+        kind = MarkupContent.KIND_MARKDOWN,
+        value = @"```vala\n$(code)\n```"
+      };
+
       client.reply(id, object_to_variant(hover));
     }
 
@@ -657,7 +661,7 @@ namespace VLS
       if (loginfo) info(@"Found $(find_symbol.symbols.size) symbol(s)");
 
       Vala.Symbol best_symbol = find_symbol.best_symbol;
-      if (loginfo) info(@"Best symbol ($(code_node_to_string (best_symbol)))");
+      if (loginfo) info(@"Best symbol ($(code_node_to_string(best_symbol)))");
 
       return best_symbol;
     }
@@ -690,74 +694,7 @@ namespace VLS
         return null;
       }
 
-      string completion_member;
-      Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(source_file, position.line, position.character, out completion_member);
-      if (symbols == null)
-      {
-        return null;
-      }
-
-      var completion_list = new CompletionList();
-      completion_list.isIncomplete = false;
-      var completion_items = new JsonArrayList<CompletionItem>();
-      completion_list.items = completion_items;
-      Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
-      for (bool has_next = iter.next(); has_next; has_next = iter.next())
-      {
-        string name = iter.get_key();
-        OrderedSymbol ordered_symbol = iter.get_value();
-        Vala.Symbol symbol = ordered_symbol.symbol;
-        string code = get_symbol_definition_code(symbol);
-        var completion_item = new CompletionItem();
-        completion_item.label = name;
-        completion_item.detail = code;
-        completion_item.sortText = "%03d:%s".printf(ordered_symbol.order, code);
-        completion_item.insertText = name;
-        completion_item.insertTextFormat = InsertTextFormat.PlainText;
-        if (symbol is Vala.Field)
-        {
-          completion_item.kind = CompletionItemKind.Field;
-        }
-        if (symbol is Vala.Property)
-        {
-          completion_item.kind = CompletionItemKind.Property;
-        }
-        if (symbol is Vala.Variable || symbol is Vala.Parameter)
-        {
-          completion_item.kind = CompletionItemKind.Variable;
-        }
-        if (symbol is Vala.Method)
-        {
-          completion_item.kind = CompletionItemKind.Method;
-        }
-        if (symbol is Vala.Delegate)
-        {
-          completion_item.kind = CompletionItemKind.Method;
-        }
-        if (symbol is Vala.Class || symbol is Vala.Struct)
-        {
-          completion_item.kind = CompletionItemKind.Class;
-        }
-        if (symbol is Vala.Enum || symbol is Vala.ErrorDomain)
-        {
-          completion_item.kind = CompletionItemKind.Enum;
-        }
-        if (symbol is Vala.EnumValue || symbol is Vala.ErrorCode)
-        {
-          completion_item.kind = CompletionItemKind.EnumMember;
-        }
-        if (symbol is Vala.Interface)
-        {
-          completion_item.kind = CompletionItemKind.Interface;
-        }
-        if (symbol is Vala.Namespace)
-        {
-          completion_item.kind = CompletionItemKind.Module;
-        }
-        completion_items.add(completion_item);
-      }
-
-      return completion_list;
+      return get_completion_list(context, source_file, position);
     }
 
     private void on_textDocument_signatureHelp(Jsonrpc.Client client, string method, Variant id, Variant @params)
@@ -790,289 +727,7 @@ namespace VLS
         return null;
       }
 
-      uint line = position.line, character = position.character;
-      int index = get_char_byte_index(source_file.content, line, character) - 1;
-      string source = source_file.content;
-      if (source[index] != '(')
-      {
-        if (source[index] == ')')
-        {
-          last_signatureHelp = null;
-        }
-        return last_signatureHelp;
-      }
-      while (index >= 0 && source[index] != '\n' && !source[index].isalnum() && source[index] != '_')
-      {
-        character -= 1;
-        index -= 1;
-      }
-      if (!source[index].isalnum() && source[index] != '_')
-      {
-        if (loginfo) info("Cannot backtrack to method name");
-        return null;
-      }
-
-      string completion_member;
-      Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(source_file, line, character, out completion_member);
-
-      if (symbols == null)
-      {
-        return null;
-      }
-
-      OrderedSymbol? ordered_symbol = symbols.get(completion_member);
-      if (ordered_symbol == null)
-      {
-        warning(@"Completion member is not in the completion symbols ($(completion_member))");
-        return null;
-      }
-
-      Vala.Symbol completion_symbol = ordered_symbol.symbol;
-      Vala.Method? completion_method = completion_symbol as Vala.Method;
-      if (completion_method == null)
-      {
-        warning(@"Completion symbol is not a method ($(code_node_to_string (completion_symbol)))");
-        return null;
-      }
-
-      var signature_information = new SignatureInformation();
-      signature_information.label = get_symbol_definition_code(completion_method);
-      signature_information.parameters = new JsonArrayList<ParameterInformation>();
-      Vala.List<Vala.Parameter> parameters = completion_method.get_parameters();
-      var signature_help = new SignatureHelp();
-      signature_help.signatures = new JsonArrayList<SignatureInformation>();
-      signature_help.signatures.add(signature_information);
-      signature_help.activeSignature = 0;
-
-      last_signatureHelp = signature_help;
-
-      return signature_help;
-    }
-
-    private bool completion_pending = false;
-
-    private Gee.Map<string, OrderedSymbol>? get_completion_symbols(SourceFile source_file, uint line, uint character, out string completion_member)
-    {
-      string current_source = source_file.content;
-      try
-      {
-        int position_index = get_char_byte_index(source_file.content, line, character);
-        string completion_expression = extract_completion_expression(source_file.content, position_index);
-        if (completion_expression.has_suffix(".") || completion_expression == "")
-        {
-          completion_expression += completion_wildcard_name;
-        }
-        if (loginfo) info(@"Completion expression ($(completion_expression))");
-
-        int line_index = get_char_byte_index(source_file.content, line, 0);
-        int start_index = skip_source_spaces(source_file.content, line_index);
-        int next_line_index = get_char_byte_index(source_file.content, line + 1, 0);
-        string line_str = source_file.content.slice(line_index, next_line_index);
-        string insert_str = @"int $(completion_symbol_name) = $(completion_expression); ";
-        if (line_str.contains("{"))
-        {
-          insert_str += "{";
-        }
-        insert_str += "//";
-        source_file.content = source_file.content.splice(start_index, start_index, insert_str);
-
-        context.check();
-        return handle_completion_aux(source_file, out completion_member);
-      }
-      finally
-      {
-        source_file.content = current_source;
-      }
-    }
-
-    private static string extract_completion_expression(string source, int index)
-    {
-      int current = index - 1;
-      int num_delimiters = 0;
-      bool in_string = false;
-      bool in_triple_string = false;
-      bool in_space = false;
-      while (current >= 0)
-      {
-        char c = source[current];
-        if (in_string)
-        {
-          if (c == '"')
-          {
-            if (in_triple_string && current >= 2 && source[current - 1] == '"' && source[current - 2] == '"')
-            {
-              in_triple_string = false;
-              in_string = false;
-            }
-            else if (current >= 1 && source[current - 1] != '\\')
-            {
-              in_string = false;
-            }
-          }
-        }
-        else
-        {
-          if (c == '"')
-          {
-            in_string = true;
-            if (current >= 2 && source[current - 1] == '"' && source[current - 2] == '"')
-            {
-              in_triple_string = true;
-              current -= 2;
-            }
-          }
-          else if (c == ')' || c == ']')
-          {
-            num_delimiters += 1;
-          }
-          else if (num_delimiters > 0 && (c == '(' || c == '['))
-          {
-            num_delimiters -= 1;
-          }
-          else if (num_delimiters == 0 && !c.isspace() && !c.isalnum() && c != '_' && c != '.')
-          {
-            break;
-          }
-          else if (num_delimiters == 0 && in_space && c.isalnum())
-          {
-            break;
-          }
-          in_space = c.isspace();
-        }
-        current -= 1;
-      }
-      return source.slice(current + 1, index).strip();
-    }
-
-    private Gee.Map<string, OrderedSymbol>? handle_completion_aux(SourceFile source_file, out string completion_member)
-    {
-      Vala.Symbol? completion_symbol = find_symbol_by_name(source_file.file, completion_symbol_name);
-      if (completion_symbol == null)
-      {
-        return null;
-      }
-
-      var completion_variable = completion_symbol as Vala.Variable;
-      if (completion_variable == null)
-      {
-        warning("Completion symbol is not a variable");
-        return null;
-      }
-
-      if (loginfo) info(@"Completion symbol ($(code_scope_to_string (completion_variable)))");
-      if (loginfo) info(@"Completion symbol initializer ($(code_node_to_string (completion_variable.initializer)))");
-
-      Vala.MemberAccess? completion_initializer = completion_variable.initializer as Vala.MemberAccess;
-      if (completion_initializer == null)
-      {
-        warning("Completion initializer is not a member access");
-        return null;
-      }
-
-      Vala.TypeSymbol? parent_type = get_node_parent_of_type<Vala.TypeSymbol>(completion_variable);
-      Vala.Symbol? parent_ancestor_type = get_ancestor_type(parent_type);
-      Vala.Method? parent_method = get_node_parent_of_type<Vala.Method>(completion_variable);
-      Vala.Namespace? parent_namespace = get_node_parent_of_type<Vala.Namespace>(completion_variable);
-      if (loginfo) info(@"Completion symbol parent type ($(code_scope_to_string (parent_type)))");
-      if (loginfo) info(@"Completion symbol ancestor type ($(code_scope_to_string (parent_ancestor_type)))");
-      if (loginfo) info(@"Completion symbol parent method ($(code_scope_to_string (parent_method)))");
-      if (loginfo) info(@"Completion symbol parent namespace ($(code_scope_to_string (parent_namespace)))");
-
-      completion_member = completion_initializer.member_name;
-      Vala.Expression? completion_inner = completion_initializer.inner;
-      if (completion_inner == null)
-      {
-        Gee.Map<string, OrderedSymbol> global_symbols = get_global_symbols(completion_variable, SymbolFlags.ALL);
-        if (completion_member != completion_wildcard_name)
-        {
-          filter_completion_symbols(global_symbols, completion_member);
-        }
-        return global_symbols;
-      }
-      if (loginfo) info(@"Completion inner expression ($(code_scope_to_string (completion_inner)))");
-
-      bool is_instance;
-      Vala.Symbol? completion_inner_type = get_expression_type(completion_inner, out is_instance);
-      if (completion_inner_type == null)
-      {
-        warning("Completion inner expression has no type");
-        return null;
-      }
-      if (loginfo) info(@"Completion inner expression type ($(is_instance ? "instance " : "class ")) ($(code_scope_to_string (completion_inner_type)))");
-
-      Vala.Symbol? completion_inner_ancestor_type = get_ancestor_type(completion_inner_type);
-      if (loginfo) info(@"Completion inner expression ancestor type ($(code_scope_to_string (completion_inner_ancestor_type)))");
-
-      Vala.Namespace? completion_inner_namespace = get_node_parent_of_type<Vala.Namespace>(completion_inner_type);
-      if (loginfo) info(@"Completion inner expression namespace ($(code_scope_to_string (completion_inner_namespace)))");
-
-      bool is_same_type = completion_inner_type == parent_type;
-      bool is_related_type = completion_inner_ancestor_type == parent_ancestor_type;
-      bool is_same_namespace = completion_inner_namespace == parent_namespace;
-
-      SymbolFlags flags = SymbolFlags.NONE;
-      if (is_instance)
-      {
-        flags |= SymbolFlags.INSTANCE;
-      }
-      if (is_same_type)
-      {
-        flags |= SymbolFlags.PRIVATE;
-      }
-      if (is_related_type)
-      {
-        flags |= SymbolFlags.PROTECTED;
-      }
-      if (is_same_namespace)
-      {
-        flags |= SymbolFlags.INTERNAL;
-      }
-      if (loginfo) info(@"Available symbols ($(flags)) ($(symbol_scope_to_string (completion_inner_type, flags)))");
-
-      return get_extended_symbols(completion_inner_type, flags);
-    }
-
-    private Vala.Symbol? find_symbol_by_name(Vala.SourceFile file, string name)
-    {
-      var find_symbol = new FindSymbolByName(file, name);
-      find_symbol.find();
-      if (find_symbol.symbols.size == 0)
-      {
-        if (loginfo) info("Cannot find completion symbol");
-        return null;
-      }
-      if (find_symbol.symbols.size > 1)
-      {
-        warning("Multiple completion symbols");
-        return null;
-      }
-
-      Gee.Iterator<Vala.Symbol> iterator = find_symbol.symbols.iterator();
-      iterator.next();
-      return iterator.get();
-    }
-
-    private void filter_completion_symbols(Gee.Map<string, OrderedSymbol> symbols, string name)
-    {
-      string name_down = name.down();
-      Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
-      for (bool has_next = iter.next(); has_next; has_next = iter.next())
-      {
-        string symbol_name = iter.get_key();
-        if (!symbol_name.down().has_prefix(name_down))
-        {
-          iter.unset();
-        }
-      }
-    }
-
-    private static int skip_source_spaces(string source, int index)
-    {
-      while (source[index].isspace() && source[index] != '\n')
-      {
-        index += 1;
-      }
-      return index;
+      return get_signature_help(context, source_file, position);
     }
 
     private void on_textDocument_references(Jsonrpc.Client client, string method, Variant id, Variant @params)
@@ -1097,7 +752,7 @@ namespace VLS
       Vala.Symbol? symbol = find_symbol_by_position(reference_params.textDocument, reference_params.position);
       if (symbol == null || symbol.name == null)
       {
-        warning("Cannot find symbol at position");
+        if (logwarn) warning("Cannot find symbol at position");
         return null;
       }
       if (loginfo) info(@"Found symbol ($(code_node_to_string (symbol)))");
@@ -1140,7 +795,7 @@ namespace VLS
       Vala.Symbol? symbol = find_symbol_by_position(position_params.textDocument, position_params.position);
       if (symbol == null || symbol.name == null)
       {
-        warning("Cannot find symbol at position");
+        if (logwarn) warning("Cannot find symbol at position");
         error_message = "Cannot identify symbol under cursor";
         return null;
       }
@@ -1159,7 +814,7 @@ namespace VLS
         }
         if (node.source_reference.file.filename.has_suffix(".vapi"))
         {
-          warning(@"Cannot rename symbol ($(symbol.name)) because it referenced in VAPI ($(node.source_reference.file.filename))");
+          if (logwarn) warning(@"Cannot rename symbol ($(symbol.name)) because it referenced in VAPI ($(node.source_reference.file.filename))");
           error_message = @"Symbol ($(symbol.name)) is referenced in VAPI";
           return null;
         }
@@ -1168,7 +823,7 @@ namespace VLS
       Location? symbol_location = get_identifier_location(symbol, symbol.name, false);
       if (symbol_location == null)
       {
-        warning(@"Symbol does not contain symbol name ($(code_node_to_string (symbol)))");
+        if (logwarn) warning(@"Symbol does not contain symbol name ($(code_node_to_string (symbol)))");
         return null;
       }
       return symbol_location.range;
@@ -1194,7 +849,7 @@ namespace VLS
       Vala.Symbol? symbol = find_symbol_by_position(rename_params.textDocument, rename_params.position);
       if (symbol == null)
       {
-        warning("Cannot find symbol at position");
+        if (logwarn) warning("Cannot find symbol at position");
         return null;
       }
       if (loginfo) info(@"Found symbol ($(code_node_to_string (symbol)))");
@@ -1226,9 +881,9 @@ namespace VLS
       }
 
       return new WorkspaceEdit()
-             {
-               changes = changes
-             };
+      {
+        changes = changes
+      };
     }
 
     private Gee.ArrayList<Vala.CodeNode> find_symbol_references(Vala.Symbol target_symbol, bool include_target_symbol)
@@ -1257,180 +912,8 @@ namespace VLS
 
     private JsonSerializableCollection<DocumentSymbol>? handle_documentSymbol(DocumentSymbolParams document_symbol_params)
     {
-      Gee.HashSet<Vala.Symbol> symbols = find_symbols_in_file(document_symbol_params.textDocument);
+      TextDocumentIdentifier textDocument = document_symbol_params.textDocument;
 
-      var document_symbol_map = new Gee.HashMap<Vala.Symbol, DocumentSymbol>();
-      foreach (Vala.Symbol symbol in symbols)
-      {
-        if (logdebug) debug(@"process symbol ($(code_node_to_string (symbol)))");
-        DocumentSymbol? document_symbol = add_document_symbol_to_map(symbol, document_symbol_map);
-      }
-
-      JsonSerializableCollection<DocumentSymbol> document_symbols = null;
-      foreach (Gee.Map.Entry<Vala.Symbol, DocumentSymbol> entry in document_symbol_map.entries)
-      {
-        Vala.Symbol symbol = entry.key;
-        DocumentSymbol document_symbol = entry.value;
-        if (symbol is Vala.Namespace && symbol.name == null)
-        {
-          if (document_symbols != null)
-          {
-            warning("There are several root symbols");
-          }
-          extend_document_symbol_range(document_symbol);
-          document_symbols = document_symbol.children;
-        }
-      }
-
-      return document_symbols;
-    }
-
-    private void extend_document_symbol_range(DocumentSymbol document_symbol)
-    {
-      foreach (DocumentSymbol child_document_symbol in document_symbol.children)
-      {
-        extend_document_symbol_range(child_document_symbol);
-        if (document_symbol.range != null)
-        {
-          extend_ranges(document_symbol.range, child_document_symbol.range);
-        }
-      }
-    }
-
-    private DocumentSymbol add_document_symbol_to_map(Vala.Symbol symbol, Gee.HashMap<Vala.Symbol, DocumentSymbol> document_symbol_map)
-    {
-      DocumentSymbol? document_symbol = document_symbol_map.get(symbol);
-      if (document_symbol == null)
-      {
-        DocumentSymbol? parent_document_symbol = null;
-        if (symbol.parent_symbol != null)
-        {
-          parent_document_symbol = add_document_symbol_to_map(symbol.parent_symbol, document_symbol_map);
-          if (parent_document_symbol == null)
-          {
-            return null;
-          }
-          if (logdebug) debug(@"created parent document symbol for $(symbol.parent_symbol.name) ($(ptr_to_string (symbol.parent_symbol)), $(symbol.parent_symbol.type_name)) -> $(symbol.name) ($(ptr_to_string (symbol)), $(symbol.type_name))");
-        }
-        document_symbol = symbol_to_document_symbol(symbol);
-        if (document_symbol == null)
-        {
-          return null;
-        }
-        if (logdebug) debug(@"created document symbol for $(symbol.name) ($(ptr_to_string (symbol)), $(symbol.type_name))");
-        if (parent_document_symbol != null)
-        {
-          parent_document_symbol.children.add(document_symbol);
-        }
-        document_symbol_map.set(symbol, document_symbol);
-      }
-      return document_symbol;
-    }
-
-    private DocumentSymbol? symbol_to_document_symbol(Vala.Symbol symbol)
-    {
-      var document_symbol = new DocumentSymbol();
-
-      document_symbol.name = symbol.name;
-
-      if (symbol.source_reference != null && document_symbol.range == null)
-      {
-        document_symbol.range = source_reference_to_range(symbol.source_reference);
-      }
-
-      if (symbol is Vala.Field)
-      {
-        if (symbol.name != null && symbol.name.has_prefix("_"))
-        {
-          if (symbol.owner.lookup((string)(&symbol.name.data[1])) != null)
-          {
-            if (logdebug) debug(@"Field is hidden ($(code_node_to_string (symbol))) ($(symbol.anonymous))");
-            return null;
-          }
-        }
-        document_symbol.kind = SymbolKind.Field;
-      }
-      else if (symbol is Vala.Property)
-      {
-        document_symbol.kind = SymbolKind.Property;
-      }
-      else if (symbol is Vala.Method)
-      {
-        if (symbol is Vala.CreationMethod)
-        {
-          if (symbol.name == ".new")
-          {
-            document_symbol.name = ((Vala.CreationMethod)symbol).class_name;
-          }
-          else
-          {
-            document_symbol.name = ((Vala.CreationMethod)symbol).class_name + "." + document_symbol.name;
-          }
-        }
-        document_symbol.kind = SymbolKind.Method;
-        Vala.Method method = (Vala.Method)symbol;
-        if (method.body != null)
-        {
-          extend_ranges(document_symbol.range, source_reference_to_range(method.body.source_reference));
-        }
-      }
-      else if (symbol is Vala.Destructor)
-      {
-        document_symbol.name = "~" + symbol.parent_symbol.name;
-        document_symbol.kind = SymbolKind.Method;
-        Vala.Destructor destructor = (Vala.Destructor)symbol;
-        if (destructor.body != null)
-        {
-          extend_ranges(document_symbol.range, source_reference_to_range(destructor.body.source_reference));
-        }
-      }
-      else if (symbol is Vala.Class || symbol is Vala.Struct)
-      {
-        document_symbol.kind = SymbolKind.Class;
-      }
-      else if (symbol is Vala.Enum || symbol is Vala.ErrorDomain)
-      {
-        document_symbol.kind = SymbolKind.Enum;
-      }
-      else if (symbol is Vala.EnumValue || symbol is Vala.ErrorCode)
-      {
-        document_symbol.kind = SymbolKind.EnumMember;
-      }
-      else if (symbol is Vala.Interface)
-      {
-        document_symbol.kind = SymbolKind.Interface;
-      }
-      else if (symbol is Vala.Namespace)
-      {
-        document_symbol.kind = SymbolKind.Module;
-      }
-      else
-      {
-        if (logdebug) debug(@"Symbol not returned ($(code_node_to_string (symbol)))");
-        return null;
-      }
-
-      if (document_symbol.selectionRange == null)
-      {
-        document_symbol.selectionRange = document_symbol.range;
-        if (symbol.name != null)
-        {
-          Location? location = get_identifier_location(symbol, document_symbol.name, false);
-          if (location != null)
-          {
-            document_symbol.selectionRange = location.range;
-          }
-        }
-      }
-
-      document_symbol.detail = get_symbol_definition_code(symbol);
-      document_symbol.children = new JsonArrayList<DocumentSymbol>();
-
-      return document_symbol;
-    }
-
-    private Gee.HashSet<Vala.Symbol> find_symbols_in_file(TextDocumentIdentifier textDocument)
-    {
       string uri = sanitize_file_uri(textDocument.uri);
       if (loginfo) info(@"Searching symbols, uri ($(uri))");
 
@@ -1440,9 +923,7 @@ namespace VLS
         return null;
       }
 
-      var find_symbol = new FindSymbolsInFile(source_file.file);
-      find_symbol.find();
-      return find_symbol.symbols;
+      return get_document_symbols(source_file);
     }
 
     private void on_shutdown(Jsonrpc.Client client, string method, Variant id, Variant @params)
@@ -1454,22 +935,6 @@ namespace VLS
     private void on_exit(Jsonrpc.Client client, Variant @params)
     {
       loop.quit();
-    }
-
-    // Takes a (line, character) position from VS code (0-based) and returns the corresponding byte offset.
-    private static int get_char_byte_index(string text, uint position_line, uint position_character)
-    {
-      int index = -1;
-      for (uint line = 0; line < position_line; ++line)
-      {
-        int next_index = text.index_of_char('\n', index + 1);
-        if (next_index == -1)
-        {
-          break;
-        }
-        index = next_index;
-      }
-      return index + 1 + text.substring(index + 1).index_of_nth_char((long)position_character);
     }
 
     private static T? variant_to_object<T>(Variant variant)

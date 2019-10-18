@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   abstract class FindNode : Vala.CodeVisitor
   {
@@ -76,6 +76,7 @@ namespace VLS
 
     public override void visit_class(Vala.Class cl)
     {
+      //  debug("visit_class: %s", code_node_to_string(cl));
       this.check_node(cl);
       cl.accept_children(this);
     }
@@ -148,14 +149,28 @@ namespace VLS
 
     public override void visit_enum(Vala.Enum en)
     {
+      debug("visit_enum: %s", code_node_to_string(en));
       this.check_node(en);
       en.accept_children(this);
+    }
+
+    public override void visit_enum_value(Vala.EnumValue ev)
+    {
+      debug("visit_enum_value: %s", code_node_to_string(ev));
+      this.check_node(ev);
+      ev.accept_children(this);
     }
 
     public override void visit_error_domain(Vala.ErrorDomain edomain)
     {
       this.check_node(edomain);
       edomain.accept_children(this);
+    }
+
+    public override void visit_error_code(Vala.ErrorCode ecode)
+    {
+      this.check_node(ecode);
+      ecode.accept_children(this);
     }
 
     public override void visit_expression_statement(Vala.ExpressionStatement stmt)
@@ -237,6 +252,7 @@ namespace VLS
 
     public override void visit_method(Vala.Method m)
     {
+      //  debug("visit_method: %s", code_node_to_string(m));
       this.check_node(m);
       m.accept_children(this);
     }

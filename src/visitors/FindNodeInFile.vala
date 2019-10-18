@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   abstract class FindNodeInFile : FindNode
   {

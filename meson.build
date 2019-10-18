@@ -1,22 +1,24 @@
 project('vala-language-server', 'vala', 'c')
 
 sources = files([
-	'Main.vala',
-	'Server.vala',
-	'Protocol.vala',
-	'Reporter.vala',
-	'Context.vala',
-	'FindNode.vala',
-	'FindNodeInFile.vala',
-	'FindNodeByPosition.vala',
-	'FindSymbolByPosition.vala',
-	'FindSymbolByName.vala',
-	'FindSymbolReferences.vala',
-	'FindSymbolsInFile.vala',
-	'CodeHelpers.vala',
-	'JsonHelpers.vala',
-	'MiscHelpers.vala',
-	'JsonSerializable.vapi'
+	'src/Main.vala',
+	'src/Server.vala',
+	'src/Reporter.vala',
+	'src/Context.vala',
+	'src/visitors/FindNode.vala',
+	'src/visitors/FindNodeInFile.vala',
+	'src/visitors/FindNodeByPosition.vala',
+	'src/visitors/FindSymbolByPosition.vala',
+	'src/visitors/FindSymbolByName.vala',
+	'src/visitors/FindSymbolReferences.vala',
+	'src/visitors/FindSymbolsInFile.vala',
+	'src/helpers/CodeHelpers.vala',
+	'src/helpers/CompletionHelpers.vala',
+	'src/helpers/DocumentSymbolHelpers.vala',
+	'src/helpers/MiscHelpers.vala',
+	'src/protocol/Protocol.vala',
+	'src/protocol/JsonSerialization.vala',
+	'src/protocol/JsonSerializable.vapi'
 ])
 
 valac = meson.get_compiler('vala')
@@ -36,7 +38,7 @@ dependencies = [
 
 if host_machine.system() == 'windows'
 	dependencies += dependency('gio-windows-2.0')
-	sources += 'windows.vapi'
+	sources += 'src/Windows.vapi'
 	add_project_arguments(['--define=WINDOWS'], language: 'vala')
 else
     dependencies += dependency('gio-unix-2.0')

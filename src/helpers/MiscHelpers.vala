@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   delegate void Action();
 
@@ -41,5 +41,17 @@ namespace VLS
   string ptr_to_string(void* ptr)
   {
     return "%#llx".printf(ptr);
+  }
+
+  bool equal_strings(char* s1, char* s2, int length)
+  {
+    for (int i = 0; i < length; i++)
+    {
+      if (s1[i] != s2[i])
+      {
+        return false;
+      }
+    }
+    return true;
   }
 }

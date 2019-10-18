@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   class FindSymbolByPosition : FindNodeByPosition
   {
@@ -13,7 +13,7 @@ namespace VLS
 
     protected override void on_node_found(Vala.CodeNode node)
     {
-      Vala.Symbol? symbol = get_symbol_reference(node);
+      Vala.Symbol? symbol = get_referenced_symbol(node);
       if (symbol == null)
       {
         return;
@@ -22,7 +22,7 @@ namespace VLS
 
       if (best_node == null)
       {
-        if (loginfo) info(@"Found first symbol ($(code_node_to_string (symbol)))");
+        if (loginfo) info(@"Found first symbol ($(code_node_to_string(symbol)))");
         best_node = node;
         best_symbol = symbol;
       }
@@ -35,25 +35,25 @@ namespace VLS
           {
             if (best_node is Vala.Symbol && !(node is Vala.Symbol))
             {
-              if (loginfo) info(@"Found worse symbol (best node is a symbol, not current node) ($(code_node_to_string (symbol)))");
+              if (loginfo) info(@"Found worse symbol (best node is a symbol, not current node) ($(code_node_to_string(symbol)))");
             }
             else
             {
-              if (loginfo) info(@"Found better symbol (matching symbols) ($(code_node_to_string (symbol)))");
+              if (loginfo) info(@"Found better symbol (matching symbols) ($(code_node_to_string(symbol)))");
               best_node = node;
               best_symbol = symbol;
             }
           }
           else
           {
-            if (loginfo) info(@"Found better symbol (more focused) ($(code_node_to_string (symbol)))");
+            if (loginfo) info(@"Found better symbol (more focused) ($(code_node_to_string(symbol)))");
             best_node = node;
             best_symbol = symbol;
           }
         }
         else
         {
-          if (loginfo) info(@"Found worse symbol (less focused) ($(code_node_to_string (symbol)))");
+          if (loginfo) info(@"Found worse symbol (less focused) ($(code_node_to_string(symbol)))");
         }
       }
     }

@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   class FindSymbolByName : FindNodeInFile
   {
@@ -31,7 +31,7 @@ namespace VLS
         return;
       }
 
-      if (loginfo) info(@"Found symbol ($(code_node_to_string (symbol))), source ($(get_code_node_source (symbol)))");
+      if (loginfo) info(@"Found symbol ($(code_node_to_string(symbol))), source ($(get_code_node_source(symbol)))");
       symbols.add(symbol);
     }
   }

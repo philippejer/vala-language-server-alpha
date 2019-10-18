@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   public class AbstractJsonSerializableObject : GLib.Object, JsonSerializableObject
   {
@@ -10,28 +10,28 @@ namespace VLS
     public virtual Json.Node serialize_property(string property_name, Value @value, ParamSpec pspec)
     {
       // Serialize primitive types explicitly otherwise zero values are ignored for some reason...
-      if (pspec.value_type.is_a(typeof (int)))
+      if (pspec.value_type.is_a(typeof(int)))
       {
         int val = value.get_int();
         var node = new Json.Node(Json.NodeType.VALUE);
         node.set_int(val);
         return node;
       }
-      else if (pspec.value_type.is_a(typeof (double)))
+      else if (pspec.value_type.is_a(typeof(double)))
       {
         double val = value.get_double();
         var node = new Json.Node(Json.NodeType.VALUE);
         node.set_double(val);
         return node;
       }
-      else if (pspec.value_type.is_a(typeof (bool)))
+      else if (pspec.value_type.is_a(typeof(bool)))
       {
         bool val = value.get_boolean();
         var node = new Json.Node(Json.NodeType.VALUE);
         node.set_boolean(val);
         return node;
       }
-      else if (pspec.value_type.is_a(typeof (JsonSerializableValue)))
+      else if (pspec.value_type.is_a(typeof(JsonSerializableValue)))
       {
         unowned JsonSerializableValue val = @value as JsonSerializableValue;
         if (val == null)
@@ -56,7 +56,7 @@ namespace VLS
 
     public virtual bool deserialize_property(string property_name, ref Value @value, ParamSpec pspec, Json.Node property_node)
     {
-      if (pspec.value_type.is_a(typeof (JsonSerializableValue)))
+      if (pspec.value_type.is_a(typeof(JsonSerializableValue)))
       {
         JsonSerializableValue val = create_value(pspec.value_type, property_name);
         if (val.deserialize(property_node))
@@ -71,11 +71,11 @@ namespace VLS
 
     private JsonSerializableValue? create_value(Type value_type, string property_name)
     {
-      if (value_type.is_a(typeof (JsonSerializableCollection)))
+      if (value_type.is_a(typeof(JsonSerializableCollection)))
       {
         return create_collection(property_name);
       }
-      else if (value_type.is_a(typeof (JsonSerializableMap)))
+      else if (value_type.is_a(typeof(JsonSerializableMap)))
       {
         return create_map(property_name);
       }

@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   class FindSymbolsInFile : FindNodeInFile
   {
@@ -11,17 +11,19 @@ namespace VLS
 
     protected override void check_node(Vala.CodeNode node)
     {
-      Vala.Symbol? symbol = node as Vala.Symbol;
-      if (symbol == null)
-      {
-        return;
-      }
-      if (is_hidden_symbol(symbol))
+      if (node.source_reference == null || node.source_reference.file != this.file)
       {
         return;
       }
 
-      if (logdebug) debug(@"Found symbol ($(code_node_to_string (symbol)))");
+      Vala.Symbol? symbol = node as Vala.Symbol;
+      
+      if (symbol == null || is_hidden_symbol(symbol))
+      {
+        return;
+      }
+
+      if (logdebug) debug(@"Found symbol ($(code_node_to_string(symbol)))");
       symbols.add(symbol);
     }
   }

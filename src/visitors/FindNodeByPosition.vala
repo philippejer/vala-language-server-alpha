@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   abstract class FindNodeByPosition : FindNodeInFile
   {
@@ -32,7 +32,7 @@ namespace VLS
 
       if (begin.line > end.line)
       {
-        warning(@"Source reference begins after it ends ($(source_reference))");
+        if (logwarn) warning(@"Source reference begins after it ends ($(source_reference))");
         return;
       }
 
@@ -55,8 +55,8 @@ namespace VLS
       }
       found_nodes.add(node);
 
-      if (logdebug) debug(@"Found node ($(code_node_to_string (node))), source ($(get_code_node_source (node)))");
-      if (loginfo) info(@"Found node ($(code_node_to_string (node)))");
+      if (logdebug) debug(@"Found node ($(code_node_to_string(node))), source ($(get_code_node_source(node)))");
+      if (loginfo) info(@"Found node ($(code_node_to_string(node)))");
       on_node_found(node);
     }
 

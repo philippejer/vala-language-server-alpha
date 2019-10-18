@@ -1,4 +1,4 @@
-namespace VLS
+namespace Vls
 {
   enum ErrorCodes
   {
@@ -163,9 +163,9 @@ namespace VLS
     //  experimental : any;
   }
 
-/**
- * Signature help options.
- */
+  /**
+   * Signature help options.
+   */
   class SignatureHelpOptions : AbstractJsonSerializableObject
   {
     /**
@@ -175,9 +175,9 @@ namespace VLS
     public JsonSerializableCollection<string> triggerCharacters { get; set; }
   }
 
-/**
- * Rename options
- */
+  /**
+   * Rename options
+   */
   class RenameOptions : AbstractJsonSerializableObject
   {
     /**
@@ -213,10 +213,10 @@ namespace VLS
     }
   }
 
-/**
- * An event describing a change to a text document. If range and rangeLength are omitted
- * the new text is considered to be the full content of the document.
- */
+  /**
+   * An event describing a change to a text document. If range and rangeLength are omitted
+   * the new text is considered to be the full content of the document.
+   */
   class TextDocumentContentChangeEvent : AbstractJsonSerializableObject
   {
     /**
@@ -335,9 +335,9 @@ namespace VLS
     public JsonSerializableMap<JsonSerializableCollection<TextEdit>> changes { get; set; }
   }
 
-/**
- * Defines how the host (editor) should sync document changes to the language server.
- */
+  /**
+   * Defines how the host (editor) should sync document changes to the language server.
+   */
   enum TextDocumentSyncKind
   {
     Unset = -1,
@@ -393,9 +393,9 @@ namespace VLS
     public SaveOptions save { get; set; }
   }
 
-/**
- * Completion options.
- */
+  /**
+   * Completion options.
+   */
   class CompletionOptions : AbstractJsonSerializableObject
   {
     /**
@@ -475,20 +475,53 @@ namespace VLS
     Hint = 4
   }
 
-/**
- * The result of a hover request.
- */
+  /**
+   * The result of a hover request.
+   */
   class Hover : AbstractJsonSerializableObject
   {
     /**
      * The hover's content
      */
-    public string contents { get; set; }
+    public MarkupContent contents { get; set; }
     /**
      * An optional range is a range inside a text document
      * that is used to visualize a hover, e.g. by changing the background color.
      */
     public Range range { get; set; }
+  }
+
+  /**
+   * A `MarkupContent` literal represents a string value which content is interpreted base on its
+   * kind flag. Currently the protocol supports `plaintext` and `markdown` as markup kinds.
+   *
+   * If the kind is `markdown` then the value can contain fenced code blocks like in GitHub issues.
+   * See https://help.github.com/articles/creating-and-highlighting-code-blocks/#syntax-highlighting
+   *
+   * Here is an example how such a string can be constructed using JavaScript / TypeScript:
+   * ```typescript
+   * let markdown: MarkdownContent = {
+   *  kind: MarkupKind.Markdown,
+   *	value: [
+   *		'# Header',
+   *		'Some text',
+   *		'```typescript',
+   *		'someCode();',
+   *		'```'
+   *	].join('\n')
+   * };
+   * ```
+   *
+   * *Please Note* that clients might sanitize the return markdown. A client could decide to
+   * remove HTML from the markdown to avoid script execution.
+   */
+  class MarkupContent : AbstractJsonSerializableObject
+  {
+    public const string KIND_PLAIN_TEXT = "plaintext";
+    public const string KIND_MARKDOWN = "markdown";
+
+    public string kind { get; set; }
+    public string value { get; set; }
   }
 
   class CompletionParams : TextDocumentPositionParams
@@ -532,10 +565,10 @@ namespace VLS
     TriggerForIncompleteCompletions = 3
   }
 
-/**
- * Represents a collection of [completion items](#CompletionItem) to be presented
- * in the editor.
- */
+  /**
+   * Represents a collection of [completion items](#CompletionItem) to be presented
+   * in the editor.
+   */
   class CompletionList : AbstractJsonSerializableObject
   {
     /**
@@ -573,7 +606,7 @@ namespace VLS
     /**
      * A human-readable string that represents a doc-comment.
      */
-    public string documentation { get; set; }
+    public MarkupContent documentation { get; set; }
 
     /**
      * Indicates if this item is deprecated.
@@ -655,9 +688,9 @@ namespace VLS
     public Command command { get; set; }
   }
 
-/**
- * The kind of a completion entry.
- */
+  /**
+   * The kind of a completion entry.
+   */
   enum CompletionItemKind
   {
     Unset = -1,
@@ -696,11 +729,11 @@ namespace VLS
     public TextDocumentIdentifier textDocument { get; set; }
   }
 
-/**
- * Represents programming constructs like variables, classes, interfaces etc. that appear in a document. Document symbols can be
- * hierarchical and they have two ranges: one that encloses its definition and one that points to its most interesting range,
- * e.g. the range of an identifier.
- */
+  /**
+   * Represents programming constructs like variables, classes, interfaces etc. that appear in a document. Document symbols can be
+   * hierarchical and they have two ranges: one that encloses its definition and one that points to its most interesting range,
+   * e.g. the range of an identifier.
+   */
   class DocumentSymbol : AbstractJsonSerializableObject
   {
     /**
@@ -743,9 +776,9 @@ namespace VLS
     public JsonSerializableCollection<DocumentSymbol> children { get; set; }
   }
 
-/**
- * A symbol kind.
- */
+  /**
+   * A symbol kind.
+   */
   enum SymbolKind
   {
     Unset = -1,
@@ -809,10 +842,10 @@ namespace VLS
     public JsonSerializableCollection<string> arguments { get; set; }
   }
 
-/**
- * Defines whether the insert text in a completion item should be interpreted as
- * plain text or a snippet.
- */
+  /**
+   * Defines whether the insert text in a completion item should be interpreted as
+   * plain text or a snippet.
+   */
   enum InsertTextFormat
   {
     Unset = -1,
@@ -831,11 +864,11 @@ namespace VLS
     Snippet = 2
   }
 
-/**
- * Signature help represents the signature of something
- * callable. There can be multiple signature but only one
- * active and only one active parameter.
- */
+  /**
+   * Signature help represents the signature of something
+   * callable. There can be multiple signature but only one
+   * active and only one active parameter.
+   */
   class SignatureHelp : AbstractJsonSerializableObject
   {
     /**
@@ -876,11 +909,11 @@ namespace VLS
     }
   }
 
-/**
- * Represents the signature of something callable. A signature
- * can have a label, like a function-name, a doc-comment, and
- * a set of parameters.
- */
+  /**
+   * Represents the signature of something callable. A signature
+   * can have a label, like a function-name, a doc-comment, and
+   * a set of parameters.
+   */
   class SignatureInformation : AbstractJsonSerializableObject
   {
     /**
@@ -893,7 +926,7 @@ namespace VLS
      * The human-readable doc-comment of this signature. Will be shown
      * in the UI but can be omitted.
      */
-    public string documentation { get; set; }
+    public MarkupContent documentation { get; set; }
 
     /**
      * The parameters of this signature.
@@ -911,10 +944,10 @@ namespace VLS
     }
   }
 
-/**
- * Represents a parameter of a callable-signature. A parameter can
- * have a label and a doc-comment.
- */
+  /**
+   * Represents a parameter of a callable-signature. A parameter can
+   * have a label and a doc-comment.
+   */
   class ParameterInformation : AbstractJsonSerializableObject
   {
     /**
@@ -949,37 +982,37 @@ namespace VLS
     public bool includeDeclaration { get; set; }
   }
 
-//  class ShowMessageParams : AbstractJsonSerializableObject
-//  {
-//    /**
-//     * The message type. See {@link MessageType}.
-//     */
-//    public MessageType @type { get, set; default = MessageType.Unset; }
+  //  class ShowMessageParams : AbstractJsonSerializableObject
+  //  {
+  //    /**
+  //     * The message type. See {@link MessageType}.
+  //     */
+  //    public MessageType @type { get, set; default = MessageType.Unset; }
 
-//    /**
-//     * The actual message.
-//     */
-//    public string message { get; set; }
-//  }
+  //    /**
+  //     * The actual message.
+  //     */
+  //    public string message { get; set; }
+  //  }
 
-//  enum MessageType
-//  {
-//    Unset = -1,
-//    /**
-//     * An error message.
-//     */
-//    Error = 1,
-//    /**
-//     * A warning message.
-//     */
-//    Warning = 2,
-//    /**
-//     * An information message.
-//     */
-//    Info = 3,
-//    /**
-//     * A log message.
-//     */
-//    Log = 4
-//  }
+  //  enum MessageType
+  //  {
+  //    Unset = -1,
+  //    /**
+  //     * An error message.
+  //     */
+  //    Error = 1,
+  //    /**
+  //     * A warning message.
+  //     */
+  //    Warning = 2,
+  //    /**
+  //     * An information message.
+  //     */
+  //    Info = 3,
+  //    /**
+  //     * A log message.
+  //     */
+  //    Log = 4
+  //  }
 }

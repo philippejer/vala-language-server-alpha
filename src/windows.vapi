@@ -1,3 +1,4 @@
+/** Windows equivalents of the POSIX functions. */
 [CCode(cprefix = "", lower_case_cprefix = "", cheader_filename = "windows.h")]
 namespace Windows
 {
