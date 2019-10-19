@@ -5,6 +5,27 @@ namespace Vls
     FAILED
   }
 
+  enum DebugLevel
+  {
+    OFF = 0,
+    WARN,
+    INFO,
+    DEBUG;
+
+    public string to_string()
+    {
+      return ((EnumClass)typeof(DebugLevel).class_ref()).get_value(this).value_nick;
+    }
+  }
+
+  DebugLevel debug_level = DebugLevel.OFF;
+
+  bool logdebug = false;
+  bool loginfo = false;
+  bool logwarn = false;
+
+  Server server = null;
+
   class Server
   {
     const int check_diagnostics_period_ms = 100;
@@ -309,6 +330,8 @@ namespace Vls
       string targets_json = proc_stdout;
       Json.Node targets_node = parse_json(targets_json);
       if (logdebug) debug(@"targets ($(Json.to_string(targets_node, true)))");
+
+      bool has_target = false;
       Json.Array targets_array = targets_node.get_array();
       targets_array.foreach_element((array, index, target_node) =>
       {
@@ -317,10 +340,16 @@ namespace Vls
         string target_type = target_object.get_string_member("type");
         if (loginfo) info(@"target ($(target_name)) ($(target_type))");
 
+        if (has_target)
+        {
+          if (logwarn) warning(@"Multiple Vala targets found in Meson build file, only the first target will be added, additional target '$(target_name)' ($(target_type)) ignored");
+          return;
+        }
+        has_target = true;
+
         Json.Array target_sources_array = target_object.get_array_member("target_sources");
         target_sources_array.foreach_element((array, index, target_source_node) =>
         {
-
           Json.Object target_source_object = target_source_node.get_object();
 
           string language = target_source_object.get_string_member("language");
@@ -460,7 +489,9 @@ namespace Vls
 
       if (source_file.version > version)
       {
-        throw new Error.FAILED(@"Rejecting outdated version ($(uri)))");
+        // Seems to cause more issues than anything...
+        //  throw new Error.FAILED(@"Rejecting outdated version ($(uri)))");
+        if (logwarn) warning(@"Received outdated version ($(version)) vs. file version ($(source_file.version)), uri ($(uri)))");
       }
       source_file.version = version;
 

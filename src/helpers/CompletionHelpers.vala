@@ -157,6 +157,7 @@ namespace Vls
     bool in_string = false;
     bool in_triple_string = false;
     bool in_space = false;
+    bool in_dot = false;
     while (current >= 0)
     {
       char c = source[current];
@@ -186,7 +187,7 @@ namespace Vls
             current -= 2;
           }
         }
-        else if (c == ')' || c == ']')
+        else if ((in_dot || num_delimiters > 0) && (c == ')' || c == ']'))
         {
           num_delimiters += 1;
         }
@@ -203,13 +204,24 @@ namespace Vls
           break;
         }
         in_space = c.isspace();
+        in_dot = (c == '.');
       }
       current -= 1;
     }
     return source.slice(current + 1, index).strip();
   }
 
-
+  void _test_extract_completion_expression()
+  {
+    Test.add_func("/CompletionHelpers/extract_completion_expression/1", () =>
+      test_equal_strings("foo.ba", extract_completion_expression("some_method(foo.ba", "some_method(foo.ba".length)));
+    Test.add_func("/CompletionHelpers/extract_completion_expression/2", () =>
+      test_equal_strings("debu", extract_completion_expression("() debu", "() debu".length)));
+    Test.add_func("/CompletionHelpers/extract_completion_expression/3", () =>
+      test_equal_strings("(a + b).complete_me", extract_completion_expression(", (a + b).complete_me", ", (a + b).complete_me".length)));
+    Test.add_func("/CompletionHelpers/extract_completion_expression/4", () =>
+      test_equal_strings("complete_me", extract_completion_expression(", (a + b)complete_me", ", (a + b)complete_me".length)));
+  }
 
   /**
    * Returns the completion symbols at the specified position.

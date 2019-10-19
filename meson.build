@@ -1,7 +1,6 @@
 project('vala-language-server', 'vala', 'c')
 
 sources = files([
-	'src/Main.vala',
 	'src/Server.vala',
 	'src/Reporter.vala',
 	'src/Context.vala',
@@ -16,6 +15,7 @@ sources = files([
 	'src/helpers/CompletionHelpers.vala',
 	'src/helpers/DocumentSymbolHelpers.vala',
 	'src/helpers/MiscHelpers.vala',
+	'src/helpers/TestHelpers.vala',
 	'src/protocol/Protocol.vala',
 	'src/protocol/JsonSerialization.vala',
 	'src/protocol/JsonSerializable.vapi'
@@ -70,5 +70,10 @@ add_project_arguments([
 
 executable('vala-language-server',
 	dependencies: dependencies,
-	sources: [sources],
+	sources: [sources, 'src/Main.vala'],
+	install: true)
+
+executable('vala-language-server-tests',
+	dependencies: dependencies,
+	sources: [sources, 'src/TestMain.vala'],
 	install: true)

@@ -1,45 +1,43 @@
 namespace Vls
 {
-  Server server;
-
-  bool logdebug = false;
-  bool loginfo = false;
-  bool logwarn = false;
-
-  void main()
+  void main(string[] args)
   {
-    string[] environment = Environ.get();
-    string vls_debug = Environ.get_variable(environment, "VLS_DEBUG");
+    debug_level = get_debug_level();
+
 #if WINDOWS
-    stdout.printf("Running in Windows (debug mode: %s, API version: %s, BUILD version: %s)...\n", vls_debug, Vala.API_VERSION, Vala.BUILD_VERSION);
+    stdout.printf("Server running in Windows (debug level: %s, API version: %s, BUILD version: %s)...\n", debug_level.to_string(), Vala.API_VERSION, Vala.BUILD_VERSION);
 #else
-    stdout.printf("Running in Unix (debug mode: %s, API version: %s, BUILD version: %s)...\n", vls_debug, Vala.API_VERSION, Vala.BUILD_VERSION);
+    stdout.printf("Server running in Unix (debug level: %s, API version: %s, BUILD version: %s)...\n", debug_level.to_string(), Vala.API_VERSION, Vala.BUILD_VERSION);
 #endif
-    if (vls_debug == "debug")
-    {
-      logdebug = true;
-      loginfo = true;
-      logwarn = true;
-    }
-    else if (vls_debug == "info")
-    {
-      loginfo = true;
-      logwarn = true;
-    }
-    else if (vls_debug == "warn")
-    {
-      logwarn = true;
-    }
-    else if (vls_debug != null && vls_debug != "" && vls_debug != "false" && vls_debug != "0")
-    {
-      // Info level by default when the variable is "truthy"
-      logdebug = false;
-      loginfo = true;
-      logwarn = true;
-    }
+
+    logdebug = (debug_level >= DebugLevel.DEBUG);
+    loginfo = (debug_level >= DebugLevel.INFO);
+    logwarn = (debug_level >= DebugLevel.WARN);
 
     var loop = new MainLoop();
     server = new Server(loop);
     loop.run();
+  }
+
+  private DebugLevel get_debug_level()
+  {
+    string[] environment = Environ.get();
+    string vls_debug = Environ.get_variable(environment, "VLS_DEBUG");
+    switch (vls_debug)
+    {
+    case "debug":
+      return DebugLevel.DEBUG;
+    case "info":
+      return DebugLevel.INFO;
+    case "warn":
+      return DebugLevel.WARN;
+    case "off":
+      return DebugLevel.OFF;
+    case "true":
+    case "1":
+      return DebugLevel.INFO;
+    default:
+      return DebugLevel.OFF;
+    }
   }
 }
