@@ -270,11 +270,11 @@ namespace Vls
     }
     if (loginfo) info(@"Completion inner expression ($(code_scope_to_string(completion_inner)))");
 
-    bool is_instance;
+    bool? is_instance;
     Vala.Symbol? completion_inner_type = get_expression_type(completion_inner, out is_instance);
     if (completion_inner_type == null)
     {
-      if (logwarn) warning("Completion inner expression has no type");
+      if (loginfo) info(@"Completion inner expression has no type $(code_scope_to_string(completion_inner)))");
       return null;
     }
     if (loginfo) info(@"Completion inner expression type ($(is_instance ? "instance" : "class")) ($(code_scope_to_string(completion_inner_type)))");
