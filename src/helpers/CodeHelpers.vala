@@ -158,7 +158,31 @@ namespace Vls
       source = @"[$(parent_symbol.name)] $(source)";
     }
 
-    return source;
+    // Flatten the string otherwise display is mangled (at least in VSCode)
+    return remove_extra_spaces(source);
+  }
+
+  /** Removes consecutive spaces and replaces newline by space to make a snippet suitable for one-line display (e.g. document outline). */
+  string remove_extra_spaces(string input)
+  {
+    var builder = new StringBuilder();
+    char* data = input.data;
+    char last_char = 0;
+    while (data[0] != 0)
+    {
+      char cur_char = data[0];
+      if (cur_char == '\t')
+      {
+        cur_char = ' ';
+      }
+      if (cur_char != '\r' && cur_char != '\n' && (last_char != ' ' || cur_char != ' '))
+      {
+        builder.append_c(cur_char);
+      }
+      last_char = cur_char;
+      data += 1;
+    }
+    return builder.str;
   }
 
   /** Returns the definition of 'symbol' from the source code.  */
@@ -206,12 +230,15 @@ namespace Vls
     char* begin = method.source_reference.begin.pos;
     char* max = method.source_reference.file.get_mapped_contents() + method.source_reference.file.get_mapped_length();
     char* pos = find_text_between_parens(begin, max);
-    pos = pos != null ? find_tokens(pos, max, { '\r', '\n', '{', ';' }) : null;
-    char* end = pos == null ? method.source_reference.end.pos : pos + 1;
+    pos = pos != null ? find_tokens(pos, max, { '{', ';' }) : null;
+    char* end = pos == null ? method.source_reference.end.pos : pos;
     return get_string_from_pointers(begin, end);
   }
 
-  /** Searches for a text fragment delimited by parentheses between 'begin' and 'max' ('max' excluded from search). */
+  /**
+   * Searches for a text fragment delimited by parentheses between 'begin' and 'max' ('max' excluded from search).
+   * Returns the position after the last parenthesis.
+   */
   char* find_text_between_parens(char* begin, char* max)
   {
     int num_delimiters = 0;
@@ -232,7 +259,7 @@ namespace Vls
       }
       pos += 1;
     }
-    return pos == max ? null : pos;
+    return pos == max ? null : pos + 1;
   }
 
   /** Returns the symbol referenced by 'node' (if any). */
