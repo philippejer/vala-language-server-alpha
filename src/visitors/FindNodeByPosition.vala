@@ -56,7 +56,6 @@ namespace Vls
       found_nodes.add(node);
 
       if (logdebug) debug(@"Found node ($(code_node_to_string(node))), source ($(get_code_node_source(node)))");
-      if (loginfo) info(@"Found node ($(code_node_to_string(node)))");
       on_node_found(node);
     }
 
