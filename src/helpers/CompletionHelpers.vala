@@ -158,8 +158,8 @@ namespace Vls
     int num_delimiters = 0;
     bool in_string = false;
     bool in_triple_string = false;
-    bool in_space = false;
-    bool in_dot = false;
+    char last_char = 0;
+    char last_non_space_char = 0;
     while (current >= 0)
     {
       char c = source[current];
@@ -189,7 +189,7 @@ namespace Vls
             current -= 2;
           }
         }
-        else if ((in_dot || num_delimiters > 0) && (c == ')' || c == ']'))
+        else if ((last_non_space_char == '.' || num_delimiters > 0) && (c == ')' || c == ']'))
         {
           num_delimiters += 1;
         }
@@ -197,16 +197,19 @@ namespace Vls
         {
           num_delimiters -= 1;
         }
-        else if (num_delimiters == 0 && !c.isspace() && !c.isalnum() && c != '_' && c != '.')
+        else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.')
         {
           break;
         }
-        else if (num_delimiters == 0 && in_space && c.isalnum())
+        else if (num_delimiters == 0 && last_char.isspace() && last_non_space_char != '(' && is_identifier_char(c))
         {
           break;
         }
-        in_space = c.isspace();
-        in_dot = (c == '.');
+        last_char = c;
+        if (!c.isspace())
+        {
+          last_non_space_char = c;
+        }
       }
       current -= 1;
     }
@@ -223,6 +226,10 @@ namespace Vls
       test_equal_strings("(a + b).complete_me", extract_completion_expression(", (a + b).complete_me", ", (a + b).complete_me".length)));
     Test.add_func("/CompletionHelpers/extract_completion_expression/4", () =>
       test_equal_strings("complete_me", extract_completion_expression(", (a + b)complete_me", ", (a + b)complete_me".length)));
+    Test.add_func("/CompletionHelpers/extract_completion_expression/5", () =>
+      test_equal_strings("some_method(foo.bar).baz", extract_completion_expression("something + some_method(foo.bar).baz", "something + some_method(foo.bar).baz".length)));
+    Test.add_func("/CompletionHelpers/extract_completion_expression/6", () =>
+      test_equal_strings("some_method (foo.bar).baz", extract_completion_expression("something + some_method (foo.bar).baz", "something + some_method (foo.bar).baz".length)));
   }
 
   /**
