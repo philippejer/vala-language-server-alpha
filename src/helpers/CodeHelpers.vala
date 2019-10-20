@@ -39,13 +39,13 @@ namespace Vls
     return ((string)begin).substring(0, (long)(end - begin));
   }
 
-  /** Searches for 'token' between 'begin' and 'max' ('max' excluded from search). */
-  char* _find_token(char* begin, char* max, char token)
+  /** Searches for one of 'tokens' between 'begin' and 'max' ('max' excluded from search). */
+  char* find_tokens(char* begin, char* max, char[] tokens)
   {
     char* pos = begin;
     while (pos < max)
     {
-      if (pos[0] == token)
+      if (is_one_of_tokens(pos[0], tokens))
       {
         break;
       }
@@ -55,18 +55,30 @@ namespace Vls
   }
 
   /** Searches for 'token' in reverse between 'begin' and 'min' ('min' included in search). */
-  char* find_token_reverse(char* begin, char* min, char token)
+  char* find_token_reverse(char* begin, char* min, char[] tokens)
   {
     char* pos = begin;
     while (pos >= min)
     {
-      if (pos[0] == token)
+      if (is_one_of_tokens(pos[0], tokens))
       {
         break;
       }
       pos -= 1;
     }
     return pos == min - 1 ? null : pos;
+  }
+
+  bool is_one_of_tokens(char c, char[] tokens)
+  {
+    for (int i = 0; i < tokens.length; i++)
+    {
+      if (tokens[i] == c)
+      {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Returns a string representation for 'node'. */
@@ -123,7 +135,7 @@ namespace Vls
     if (symbol.comment != null)
     {
       // Backtrack to begin of line for proper alignment of multiline comments
-      char* comment_begin = find_token_reverse(symbol.comment.source_reference.begin.pos, symbol.comment.source_reference.file.get_mapped_contents(), '\n');
+      char* comment_begin = find_token_reverse(symbol.comment.source_reference.begin.pos, symbol.comment.source_reference.file.get_mapped_contents(), { '\r', '\n' });
       comment_begin = comment_begin == null ? symbol.comment.source_reference.begin.pos : comment_begin + 1;
 
       // The comment source reference end is not valid for some reason (Vala 0.46)
@@ -194,6 +206,7 @@ namespace Vls
     char* begin = method.source_reference.begin.pos;
     char* max = method.source_reference.file.get_mapped_contents() + method.source_reference.file.get_mapped_length();
     char* pos = find_text_between_parens(begin, max);
+    pos = pos != null ? find_tokens(pos, max, { '\r', '\n', '{', ';' }) : null;
     char* end = pos == null ? method.source_reference.end.pos : pos + 1;
     return get_string_from_pointers(begin, end);
   }
@@ -220,24 +233,6 @@ namespace Vls
       pos += 1;
     }
     return pos == max ? null : pos;
-  }
-
-  /** Searches for 'word' as a "whole word" between 'begin' and 'max' ('max' is excluded from search). */
-  char* _find_word(char* begin, char* max, string word)
-  {
-    char* pos = begin;
-    int word_length = word.length;
-    char* end = max - word_length + 1;
-    while (pos < end)
-    {
-      bool is_candidate = (pos == begin || !pos[-1].isalnum()) && (pos == (end - 1) || !pos[word_length].isalnum());
-      if (is_candidate && equal_strings(pos, (char*)word, word_length))
-      {
-        break;
-      }
-      pos += 1;
-    }
-    return pos == end ? null : pos;
   }
 
   /** Returns the symbol referenced by 'node' (if any). */
@@ -344,12 +339,14 @@ namespace Vls
     int identifier_length = identifier.length;
     uint line = range.start.line;
     uint character = range.start.character;
-    int position = 0;
-    int limit = source_length - identifier_length + 1;
-    while (position < limit)
+    int pos = 0;
+    int end = source_length - identifier_length + 1;
+    while (pos < end)
     {
-      bool is_candidate = (position == 0 || !source[position - 1].isalnum()) && (position == (limit - 1) || !source[position + identifier_length].isalnum());
-      if (is_candidate && equal_strings((char*)&source.data[position], (char*)identifier, identifier_length))
+      char prev = source[pos - 1];
+      char next = source[pos + identifier_length];
+      bool is_candidate = (pos == 0 || !is_identifier_char(prev)) && (pos == (end - 1) || !is_identifier_char(next));
+      if (is_candidate && equal_strings((char*)&source.data[pos], (char*)identifier, identifier_length))
       {
         range.start.line = line;
         range.start.character = character;
@@ -357,7 +354,7 @@ namespace Vls
         range.end.character = character + identifier_length;
         return true;
       }
-      if (source[position] == '\n')
+      if (source[pos] == '\n')
       {
         line += 1;
         character = 0;
@@ -366,7 +363,7 @@ namespace Vls
       {
         character += 1;
       }
-      position += 1;
+      pos += 1;
     }
     return false;
   }
@@ -423,5 +420,10 @@ namespace Vls
       }
     }
     return true;
+  }
+
+  bool is_identifier_char(char c)
+  {
+    return c.isalnum() || c == '_' || c == '@';
   }
 }
