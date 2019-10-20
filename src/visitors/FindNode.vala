@@ -149,14 +149,12 @@ namespace Vls
 
     public override void visit_enum(Vala.Enum en)
     {
-      debug("visit_enum: %s", code_node_to_string(en));
       this.check_node(en);
       en.accept_children(this);
     }
 
     public override void visit_enum_value(Vala.EnumValue ev)
     {
-      debug("visit_enum_value: %s", code_node_to_string(ev));
       this.check_node(ev);
       ev.accept_children(this);
     }
