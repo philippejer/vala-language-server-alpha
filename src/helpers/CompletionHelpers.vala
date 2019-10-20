@@ -23,7 +23,7 @@ namespace Vls
   const string completion_wildcard_name = "__completion_wildcard__";
 
   /** Returns the list of completions at the specified position. */
-  CompletionList? get_completion_list(Context context, SourceFile source_file, Position position)
+  CompletionList? get_completion_list(Context context, SourceFile source_file, Position position) throws Error
   {
     string completion_member;
     Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, position.line, position.character, out completion_member);
@@ -108,8 +108,9 @@ namespace Vls
    *    'int __completion_symbol__ = [completion_expression];'
    * 3. Rebuild the syntax tree, find the '__completion_symbol__' node and inspect it to infer a list of proposals.
    */
-  Gee.Map<string, OrderedSymbol>? get_completion_symbols(Context context, SourceFile source_file, uint line, uint character, out string completion_member)
+  Gee.Map<string, OrderedSymbol>? get_completion_symbols(Context context, SourceFile source_file, uint line, uint character, out string completion_member) throws Error
   {
+    completion_member = null;
     string original_source = source_file.content;
     try
     {
@@ -137,6 +138,7 @@ namespace Vls
 
       // Rebuild the syntax tree to compute the completion symbols
       context.check();
+
       return compute_completion_symbols(source_file, out completion_member);
     }
     finally
@@ -224,19 +226,11 @@ namespace Vls
   }
 
   /**
-   * Returns the completion symbols at the specified position.
-   * The general strategy is to:
-   * 1. Backtrack from cursor to find something which looks like a Vala 'MemberAccess' expression (e.g. 'source_fil' or 'source_file.ope').
-   * 2. Temporarily modify the source to comment the incomplete line (so that the parser does not choke) and insert a variable declaration of the form:
-   *    'int __completion_symbol__ = [expression];'
-   * 3. Re-run the compilation, find the '__completion_symbol__' node and inspect it to infer a list of proposals.
-   */
-
-  /**
    * Finds the inserted 'int __completion_symbol__ = [completion_expression];' variable declaration and inspect it to determine a list of completions.
    */
   Gee.Map<string, OrderedSymbol>? compute_completion_symbols(SourceFile source_file, out string completion_member)
   {
+    completion_member = null;  
     Vala.Symbol? completion_symbol = find_completion_symbol(source_file.file, completion_symbol_name);
     if (completion_symbol == null)
     {
@@ -282,7 +276,7 @@ namespace Vls
     }
     if (loginfo) info(@"Completion inner expression ($(code_scope_to_string(completion_inner)))");
 
-    bool? is_instance;
+    bool is_instance;
     Vala.Symbol? completion_inner_type = get_expression_type(completion_inner, out is_instance);
     if (completion_inner_type == null)
     {
@@ -597,13 +591,13 @@ namespace Vls
    * Returns the type symbol of the specified expression.
    * Also sets 'is_instance' based on whether the expression denotes an instance of the type or the type itself.
    */
-  Vala.Symbol? get_expression_type(Vala.Expression expr, out bool? is_instance = null)
+  Vala.Symbol? get_expression_type(Vala.Expression expr, out bool is_instance)
   {
+    is_instance = false;
     Vala.Symbol? symbol = expr.symbol_reference;
     if (symbol is Vala.TypeSymbol || symbol is Vala.Namespace)
     {
       // Expression references a symbol which is a static type or namespace (not an instance of a type)
-      is_instance = false;
       return symbol;
     }
     Vala.Variable? variable = symbol as Vala.Variable;
@@ -692,7 +686,7 @@ namespace Vls
   SignatureHelp? last_signature_help = null;
 
   /** Returns the signature help to display the method declaration for a method call at the specified position (if found). */
-  SignatureHelp? get_signature_help(Context context, SourceFile source_file, Position position)
+  SignatureHelp? get_signature_help(Context context, SourceFile source_file, Position position) throws Error
   {
     uint line = position.line, character = position.character;
     int index = get_char_byte_index(source_file.content, line, character) - 1;
@@ -755,7 +749,6 @@ namespace Vls
       value = @"```vala\n$(code)\n```"
     };
     signature_information.parameters = new JsonArrayList<ParameterInformation>();
-    Vala.List<Vala.Parameter> parameters = completion_method.get_parameters();
 
     var signature_help = new SignatureHelp();
     signature_help.signatures = new JsonArrayList<SignatureInformation>();

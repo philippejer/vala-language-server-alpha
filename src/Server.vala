@@ -1,6 +1,6 @@
 namespace Vls
 {
-  errordomain Error
+  errordomain VlsError
   {
     FAILED
   }
@@ -24,7 +24,7 @@ namespace Vls
   bool loginfo = false;
   bool logwarn = false;
 
-  Server server = null;
+  Server vls_server = null;
 
   class Server
   {
@@ -48,17 +48,24 @@ namespace Vls
 
     static construct
     {
-      package_regex = new Regex("--pkg[= ](\\S+)");
-      vapidir_regex = new Regex("--vapidir[= ](\\S+)");
-      define_regex = new Regex("(?:(?:--define[= ])|(?:-D ))(\\S+)");
-      disable_warnings_regex = new Regex("--disable-warnings");
+      try
+      {
+        package_regex = new Regex("--pkg[= ](\\S+)");
+        vapidir_regex = new Regex("--vapidir[= ](\\S+)");
+        define_regex = new Regex("(?:(?:--define[= ])|(?:-D ))(\\S+)");
+        disable_warnings_regex = new Regex("--disable-warnings");
 #if LIBVALA_EXPERIMENTAL
-      exp_public_by_default_regex = new Regex("--exp-public-by-default");
-      exp_float_by_default_regex = new Regex("--exp-float-by-default");
-      exp_optional_semicolons_regex = new Regex("--exp-optional-semicolons");
-      exp_optional_parens_regex = new Regex("--exp-optional-parens");
-      exp_conditional_attribute_regex = new Regex("--exp-conditional-attribute");
+        exp_public_by_default_regex = new Regex("--exp-public-by-default");
+        exp_float_by_default_regex = new Regex("--exp-float-by-default");
+        exp_optional_semicolons_regex = new Regex("--exp-optional-semicolons");
+        exp_optional_parens_regex = new Regex("--exp-optional-parens");
+        exp_conditional_attribute_regex = new Regex("--exp-conditional-attribute");
 #endif
+      }
+      catch (Error err)
+      {
+        error(@"Unexpected error: $(err.message)");
+      }
     }
 
     MainLoop loop;
@@ -123,7 +130,8 @@ namespace Vls
         }
         catch (Error err)
         {
-          error(@"Uncaught error ($(err.message)))");
+          warning(@"Uncaught error: $(err.message)");
+          warning("Consider using 'Restart server' command (VSCode) to restart if this is a transient error");
         }
       });
 
@@ -171,46 +179,104 @@ namespace Vls
         }
         catch (Error err)
         {
-          error(@"Uncaught error ($(err.message)))");
+          warning(@"Uncaught error ($(err.message)))");
+          warning("Consider using the 'Restart server' command (VSCode) to restart if this is a transient error");
+          return false;
         }
       });
 
       Timeout.add(check_diagnostics_period_ms, () =>
       {
-        check_publishDiagnostics();
+        try
+        {
+          check_publishDiagnostics();
+        }
+        catch (Error err)
+        {
+          error(@"Unexpected error ($(err.message)))");
+        }
         return true;
       });
+
+      test();
     }
 
-    private void on_initialize(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void test ()
     {
-      var dict = new VariantDict(@params);
+    //    Reporter reporter = null;
+    //    //  analyze_meson_build (null, """d:\devel\workspace\vala-language-server""", """d:\devel\workspace\vala-language-server\build""");
+    //    analyze_meson_build (null, """d:\devel\workspace\test-vala""", """d:\devel\workspace\test-vala\build""");
+    //    //  analyze_meson_build (null, """d:\devel\scratch\test-vala""", """d:\devel\scratch\test-vala\build""");
+    //    debug_action_time ("Check code", () => reporter = context.check ());
+    //    string params_json = """{
+    //      "textDocument": {
+    //          "uri": "file:///d%3A/devel/workspace/test-vala/src/utils/DataUtils.vala"
+    //      },
+    //      "position": {
+    //          "line": 174,
+    //          "character": 24
+    //      },
+    //      "context": {
+    //          "triggerKind": 2,
+    //          "triggerCharacter": "."
+    //      }
+    //  }""";
+    //  Json.Node params_node = parse_json (params_json);
+    //  var @params = (CompletionParams) Json.gobject_deserialize (typeof (CompletionParams), params_node);
+    //  CompletionList? completion_list = handle_completion (@params);
+      
+    //  Json.Node params_node = parse_json (params_json);
+    //  var @params = (CompletionParams) Json.gobject_deserialize (typeof (CompletionParams), params_node);
+    //  CompletionList? completion_list = handle_completion (@params);
+    //  if (logdebug) debug (@"completion_list: ($(completion_list.items.size))");
+    //  var node = Json.gobject_serialize (completion_list);
+    //  if (logdebug) debug (@"node ($(Json.to_string (node, true)))");
+    }
 
-      string? root_uri;
-      dict.lookup("rootUri", "s", out root_uri);
+    private void on_initialize(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    {
+      var initialize_params = variant_to_object<InitializeParams>(@params);
+      string root_uri = initialize_params.rootUri;
+
       string root_path = Filename.from_uri(root_uri);
       if (loginfo) info(@"root_uri ($(root_uri)), root_path ($(root_path))");
 
-      string? meson_file = find_file_in_dir(root_path, "meson.build");
-      if (meson_file == null)
+      string? config_file = find_file_in_dir(root_path, "vala-language-server.json");
+      if (config_file != null)
       {
-        throw new Error.FAILED("Cannot find 'meson.build'");
-      }
-      string? ninja_file = find_file_in_dir(root_path, "build.ninja");
-      if (ninja_file == null)
-      {
-        throw new Error.FAILED("Cannot find 'build.ninja'");
-      }
-      string build_dir = Path.get_dirname(ninja_file);
-      reanalyze_meson_build(client, root_path, build_dir);
+        analyze_config_file(root_path, config_file);    
 
-      // Analyze again when the file changes
-      monitor_file(ninja_file, false, () =>
+        // Analyze again when the file changes
+        monitor_file(config_file, false, () =>
+        {
+          if (loginfo) info("Config file has changed, reanalyzing...");
+          analyze_config_file(root_path, config_file);    
+          request_publishDiagnostics(client);
+        });
+      }
+      else      
       {
-        if (loginfo) info("Build file has changed, reanalyzing...");
-        reanalyze_meson_build(client, root_path, build_dir);
-        request_publishDiagnostics(client);
-      });
+        string? meson_file = find_file_in_dir(root_path, "meson.build");
+        if (meson_file == null)
+        {
+          throw new VlsError.FAILED(@"Cannot find Meson build file 'meson.build' under root path ($(root_path))");
+        }
+        string? ninja_file = find_file_in_dir(root_path, "build.ninja");
+        if (ninja_file == null)
+        {
+          throw new VlsError.FAILED(@"Cannot find Ninja build file 'build.ninja' under root path ($(root_path))");
+        }
+        string build_dir = Path.get_dirname(ninja_file);
+        analyze_meson_build(root_path, build_dir);      
+
+        // Analyze again when the file changes
+        monitor_file(ninja_file, false, () =>
+        {
+          if (loginfo) info("Meson build file has changed, reanalyzing...");
+          analyze_meson_build(root_path, build_dir);
+          request_publishDiagnostics(client);
+        });
+      }
 
       try
       {
@@ -247,7 +313,7 @@ namespace Vls
       }
       catch (Error err)
       {
-        throw new Error.FAILED(@"Failed to reply to client ($(err.message)))");
+        throw new VlsError.FAILED(@"Failed to reply to client ($(err.message)))");
       }
 
       send_publishDiagnostics(client);
@@ -270,7 +336,14 @@ namespace Vls
           else
           {
             last_action_time = file_time;
-            action();
+            try
+            {
+              action();
+            }
+            catch (Error err)
+            {
+              error(@"Unexpected error: $(err.message)");
+            }
           }
         }
         last_file_time = file_time;
@@ -280,10 +353,10 @@ namespace Vls
 
     private time_t get_file_time(string file)
     {
-      return new Stat(file).st_mtime;
+      return Stat(file).st_mtime;
     }
 
-    private string? find_file_in_dir(string dirname, string target)
+    private string? find_file_in_dir(string dirname, string target) throws Error
     {
       Dir dir = Dir.open(dirname, 0);
 
@@ -309,19 +382,63 @@ namespace Vls
       return null;
     }
 
-    private void reanalyze_meson_build(Jsonrpc.Client? client, string rootdir, string builddir)
+    private void analyze_config_file(string rootdir, string config_file) throws Error
     {
-      string[] spawn_args = { "meson", "introspect", builddir, "--indent", "--targets" };
+      Json.Node config_node = null;
+      try
+      {
+        config_node = parse_json_file(config_file);
+      }
+      catch (Error err)
+      {
+        warning(@"Could not parse ($(config_file)) as JSON: $(err.message)");
+        return;
+      }
+      if (logdebug) debug(@"config ($(Json.to_string(config_node, true)))");
+
+      if (config_node.get_node_type() != Json.NodeType.OBJECT)
+      {
+        warning(@"Config file ($(config_file)) root node is not an object");
+        return;
+      }
+      Json.Object config_object = config_node.get_object();
+
+      if (!config_object.has_member("sources"))
+      {
+        if (logwarn) warning(@"Config file ($(config_file)) does not have a \"sources\" element, this is probably not right");
+        return;
+      }
+
+      Json.Array sources_array = config_object.get_array_member("sources");
+      for (int k = 0; k < sources_array.get_length(); k++)
+      {
+        string filename = sources_array.get_string_element(k);      
+        add_source_file(rootdir, filename);
+      }
+
+      if (!config_object.has_member("parameters"))
+      {
+        if (logwarn) warning(@"Config file ($(config_file)) does not have a \"parameters\" element, this is probably not right");
+        return;
+      }
+
+      string parameters = config_object.get_string_member("parameters");
+      parse_compiler_parameters(parameters);
+    }
+
+    private void analyze_meson_build(string root_path, string build_dir) throws Error
+    {
+      string[] spawn_args = { "meson", "introspect", build_dir, "--indent", "--targets" };
       string proc_stdout;
       string proc_stderr;
       int proc_status;
 
       string meson_command = string.joinv(" ", spawn_args);
       if (loginfo) info(@"Meson introspect command ($(meson_command))");
-      Process.spawn_sync(rootdir, spawn_args, null, SpawnFlags.SEARCH_PATH, null, out proc_stdout, out proc_stderr, out proc_status);
+      Process.spawn_sync(root_path, spawn_args, null, SpawnFlags.SEARCH_PATH, null, out proc_stdout, out proc_stderr, out proc_status);
       if (proc_status != 0)
       {
-        throw new Error.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout)))");
+        throw new VlsError.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout)))");
       }
 
       // Clear context since it will be repopulated from the targets
@@ -333,9 +450,9 @@ namespace Vls
 
       bool has_target = false;
       Json.Array targets_array = targets_node.get_array();
-      targets_array.foreach_element((array, index, target_node) =>
+      for (int i = 0; i < targets_array.get_length(); i++)
       {
-        Json.Object target_object = target_node.get_object();
+        Json.Object target_object = targets_array.get_object_element(i);
         string target_name = target_object.get_string_member("name");
         string target_type = target_object.get_string_member("type");
         if (loginfo) info(@"target ($(target_name)) ($(target_type))");
@@ -348,9 +465,9 @@ namespace Vls
         has_target = true;
 
         Json.Array target_sources_array = target_object.get_array_member("target_sources");
-        target_sources_array.foreach_element((array, index, target_source_node) =>
+        for (int j = 0; j < target_sources_array.get_length(); j++)
         {
-          Json.Object target_source_object = target_source_node.get_object();
+          Json.Object target_source_object = target_sources_array.get_object_element(j);
 
           string language = target_source_object.get_string_member("language");
           if (language != "vala")
@@ -362,118 +479,131 @@ namespace Vls
           {
             Json.Array parameters_array = target_source_object.get_array_member("parameters");
             string[] parameters = new string[parameters_array.get_length()];
-            parameters_array.foreach_element((array, index, parameter_node) =>
-            {
-              parameters[index] = parameter_node.get_string();
-            });
-
-            MatchInfo match_info;
-            string command_parameters = string.joinv(" ", parameters);
-            if (loginfo) info(@"Command parameters ($(command_parameters))");
-            if (package_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              do
-              {
-                string package = match_info.fetch(1);
-                if (loginfo) info(@"Adding package ($(package))");
-                context.add_package(package);
-              }
-              while (match_info.next());
-            }
-            if (vapidir_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              do
-              {
-                string vapi_directory = match_info.fetch(1);
-                if (loginfo) info(@"Adding vapi directory ($(vapi_directory))");
-                context.add_vapi_directory(vapi_directory);
-              }
-              while (match_info.next());
-            }
-            if (define_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              do
-              {
-                string define = match_info.fetch(1);
-                if (loginfo) info(@"Adding define ($(define))");
-                context.add_define(define);
-              }
-              while (match_info.next());
-            }
-            if (disable_warnings_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting disable warnings flag");
-              context.disable_warnings = true;
-            }
-#if LIBVALA_EXPERIMENTAL
-            if (exp_public_by_default_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting public by default flag");
-              context.exp_public_by_default = true;
-            }
-            if (exp_float_by_default_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting float by default flag");
-              context.exp_float_by_default = true;
-            }
-            if (exp_optional_semicolons_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting optional semicolons flag");
-              context.exp_optional_semicolons = true;
-            }
-            if (exp_optional_parens_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting optional parens flag");
-              context.exp_optional_parens = true;
-            }
-            if (exp_conditional_attribute_regex.match(command_parameters, (GLib.RegexMatchFlags) 0, out match_info))
-            {
-              if (loginfo) info("Setting conditional attribute flag");
-              context.exp_conditional_attribute = true;
-            }
-#endif
+            parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());            
+            string compiler_parameters = string.joinv(" ", parameters);
+            parse_compiler_parameters(compiler_parameters);
           }
 
           if (target_source_object.has_member("sources"))
           {
             Json.Array sources_array = target_source_object.get_array_member("sources");
-            sources_array.foreach_element((array, index, source_node) =>
+            for (int k = 0; k < sources_array.get_length(); k++)
             {
-              string anotherfilename = source_node.get_string();
-              if (!Path.is_absolute(anotherfilename))
-              {
-                anotherfilename = Path.build_filename(rootdir, anotherfilename);
-              }
-              if (is_source_file(anotherfilename))
-              {
-                string uri = sanitize_file_uri(Filename.to_uri(anotherfilename));
-                if (loginfo) info(@"Adding source file ($(anotherfilename)) ($(uri))");
-                var my_source_file = new SourceFile.from_internal(anotherfilename, uri);
-                context.add_source_file(my_source_file);
-              }
-            });
+              string filename = sources_array.get_string_element(k);
+              add_source_file(root_path, filename);
+            }
           }
-        });
-      });
+        }
+      }
     }
 
-    private void on_textDocument_didOpen(Jsonrpc.Client client, Variant @params)
+    private void add_source_file(string rootdir, string filename) throws Error
+    {
+      string absolute_filename = Path.is_absolute(filename) ? filename : Path.build_filename(rootdir, filename);
+
+      if (is_source_file(absolute_filename))
+      {
+        string uri = sanitize_file_uri(Filename.to_uri(absolute_filename));
+        if (loginfo) info(@"Adding source file ($(filename)) ($(uri))");
+        var source_file = new SourceFile.from_internal(filename, uri);
+        context.add_source_file(source_file);
+      }
+    }
+
+    private void parse_compiler_parameters(string parameters) throws Error
+    {      
+      if (loginfo) info(@"Compiler parameters ($(parameters))");
+
+      MatchInfo match_info;
+
+      if (package_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        do
+        {
+          string package = match_info.fetch(1);
+          if (loginfo) info(@"Adding package ($(package))");
+          context.add_package(package);
+        }
+        while (match_info.next());
+      }
+
+      if (vapidir_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        do
+        {
+          string vapi_directory = match_info.fetch(1);
+          if (loginfo) info(@"Adding vapi directory ($(vapi_directory))");
+          context.add_vapi_directory(vapi_directory);
+        }
+        while (match_info.next());
+      }
+
+      if (define_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        do
+        {
+          string define = match_info.fetch(1);
+          if (loginfo) info(@"Adding define ($(define))");
+          context.add_define(define);
+        }
+        while (match_info.next());
+      }
+
+      if (disable_warnings_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Setting disable warnings flag");
+        context.disable_warnings = true;
+      }
+
+#if LIBVALA_EXPERIMENTAL
+      if (exp_public_by_default_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Setting public by default flag");
+        context.exp_public_by_default = true;
+      }
+
+      if (exp_float_by_default_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Setting float by default flag");
+        context.exp_float_by_default = true;
+      }
+
+      if (exp_optional_semicolons_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Setting optional semicolons flag");
+        context.exp_optional_semicolons = true;
+      }
+
+      if (exp_optional_parens_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Setting optional parens flag");
+        context.exp_optional_parens = true;
+      }
+
+      if (exp_conditional_attribute_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Setting conditional attribute flag");
+        context.exp_conditional_attribute = true;
+      }
+#endif
+    }
+
+    private void on_textDocument_didOpen(Jsonrpc.Client client, Variant @params) throws Error
     {
       var document = @params.lookup_value("textDocument", VariantType.VARDICT);
 
       string uri = sanitize_file_uri((string)document.lookup_value("uri", VariantType.STRING));
       string language = (string)document.lookup_value("languageId", VariantType.STRING);
-      string text = (string)document.lookup_value("text", VariantType.STRING);
 
       if (loginfo) info(@"Document opened, uri ($(uri)), language ($(language))");
 
       if (language != "vala" && language != "genie")
       {
-        throw new Error.FAILED(@"Unsupported language ($(language))) sent to Vala Language Server");
+        throw new VlsError.FAILED(@"Unsupported language ($(language))) sent to Vala Language Server");
       }
     }
 
-    private void on_textDocument_didChange(Jsonrpc.Client client, Variant @params)
+    private void on_textDocument_didChange(Jsonrpc.Client client, Variant @params) throws Error
     {
       var change_params = variant_to_object<DidChangeTextDocumentParams>(@params);
       string uri = sanitize_file_uri(change_params.textDocument.uri);
@@ -482,20 +612,16 @@ namespace Vls
       if (loginfo) info(@"Document changed, uri ($(uri)), version ($(version))");
 
       SourceFile? source_file = get_source_file(uri);
-      if (source_file == null)
-      {
-        return;
-      }
+      if (source_file == null) return;
 
       if (source_file.version > version)
       {
         // Seems to cause more issues than anything...
-        //  throw new Error.FAILED(@"Rejecting outdated version ($(uri)))");
+        //  throw new VlsError.FAILED(@"Rejecting outdated version ($(uri)))");
         if (logwarn) warning(@"Received outdated version ($(version)) vs. file version ($(source_file.version)), uri ($(uri)))");
       }
       source_file.version = version;
 
-      Variant? elem = null;
       var builder = new StringBuilder(source_file.content);
       JsonSerializableCollection<TextDocumentContentChangeEvent> changes = change_params.contentChanges;
       foreach (var change in changes)
@@ -534,7 +660,7 @@ namespace Vls
       if (loginfo) info(@"Re-scheduled diagnostics in ($((int) (delay_us / 1000))) ms");
     }
 
-    private void check_publishDiagnostics()
+    private void check_publishDiagnostics() throws Error
     {
       if (publish_diagnostics_request > 0 && get_time_us() >= publish_diagnostics_time_us)
       {
@@ -544,7 +670,7 @@ namespace Vls
       }
     }
 
-    private void send_publishDiagnostics(Jsonrpc.Client client)
+    private void send_publishDiagnostics(Jsonrpc.Client client) throws Error
     {
       Reporter reporter = null;
       debug_action_time("Check context", () => reporter = context.check());
@@ -625,7 +751,7 @@ namespace Vls
       };
     }
 
-    private void on_textDocument_definition(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_definition(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
@@ -646,7 +772,7 @@ namespace Vls
       client.reply(id, object_to_variant(location));
     }
 
-    private void on_textDocument_hover(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_hover(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
@@ -670,16 +796,14 @@ namespace Vls
       client.reply(id, object_to_variant(hover));
     }
 
-    private Vala.Symbol? find_symbol_by_position(TextDocumentIdentifier textDocument, Position position)
+    private Vala.Symbol? find_symbol_by_position(TextDocumentIdentifier textDocument, Position position) throws Error
     {
       string uri = sanitize_file_uri(textDocument.uri);
       if (loginfo) info(@"Searching symbol, uri ($(uri)), position: ($(position.line).$(position.character))");
 
       SourceFile? source_file = get_source_file(uri);
-      if (source_file == null)
-      {
-        return null;
-      }
+      if (source_file == null) return null;
+
       Vala.SourceFile file = source_file.file;
 
       var find_symbol = new FindSymbolByPosition(file, position.line + 1, position.character + 1);
@@ -697,7 +821,7 @@ namespace Vls
       return best_symbol;
     }
 
-    private void on_textDocument_completion(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_completion(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var completion_params = variant_to_object<CompletionParams>(@params);
       CompletionList? completion_list = handle_completion(completion_params);
@@ -711,7 +835,7 @@ namespace Vls
       client.reply(id, object_to_variant(completion_list));
     }
 
-    private CompletionList? handle_completion(CompletionParams completion_params)
+    private CompletionList? handle_completion(CompletionParams completion_params) throws Error
     {
       TextDocumentIdentifier textDocument = completion_params.textDocument;
       string uri = sanitize_file_uri(textDocument.uri);
@@ -720,15 +844,12 @@ namespace Vls
       if (loginfo) info(@"Attempting completion, uri ($(uri)), position: ($(position.line).$(position.character))");
 
       SourceFile? source_file = get_source_file(uri);
-      if (source_file == null)
-      {
-        return null;
-      }
+      if (source_file == null) return null;
 
       return get_completion_list(context, source_file, position);
     }
 
-    private void on_textDocument_signatureHelp(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_signatureHelp(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
       SignatureHelp? signature_help = handle_signatureHelp(position_params);
@@ -742,9 +863,7 @@ namespace Vls
       client.reply(id, object_to_variant(signature_help));
     }
 
-    private SignatureHelp? last_signatureHelp = null;
-
-    private SignatureHelp? handle_signatureHelp(TextDocumentPositionParams position_params)
+    private SignatureHelp? handle_signatureHelp(TextDocumentPositionParams position_params) throws Error
     {
       TextDocumentIdentifier textDocument = position_params.textDocument;
       string uri = sanitize_file_uri(textDocument.uri);
@@ -753,15 +872,12 @@ namespace Vls
       if (loginfo) info(@"Attempting signature help, uri ($(uri)), position: ($(position.line).$(position.character))");
 
       SourceFile? source_file = get_source_file(uri);
-      if (source_file == null)
-      {
-        return null;
-      }
+      if (source_file == null) return null;
 
       return get_signature_help(context, source_file, position);
     }
 
-    private void on_textDocument_references(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_references(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var reference_params = variant_to_object<ReferenceParams>(@params);
 
@@ -778,7 +894,7 @@ namespace Vls
       client.reply(id, result);
     }
 
-    private JsonArrayList<Location> handle_references(ReferenceParams reference_params)
+    private JsonArrayList<Location>? handle_references(ReferenceParams reference_params) throws Error
     {
       Vala.Symbol? symbol = find_symbol_by_position(reference_params.textDocument, reference_params.position);
       if (symbol == null || symbol.name == null)
@@ -806,7 +922,7 @@ namespace Vls
       return locations;
     }
 
-    private void on_textDocument_prepareRename(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_prepareRename(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
@@ -814,14 +930,14 @@ namespace Vls
       Range? symbol_range = handle_prepareRename(position_params, ref error_message);
       if (symbol_range == null)
       {
-        client.reply_error_async(id, ErrorCodes.InvalidRequest, error_message, null);
+        client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, error_message, null);
         return;
       }
 
       client.reply(id, object_to_variant(symbol_range));
     }
 
-    private Range? handle_prepareRename(TextDocumentPositionParams position_params, ref string error_message)
+    private Range? handle_prepareRename(TextDocumentPositionParams position_params, ref string error_message) throws Error
     {
       Vala.Symbol? symbol = find_symbol_by_position(position_params.textDocument, position_params.position);
       if (symbol == null || symbol.name == null)
@@ -860,7 +976,7 @@ namespace Vls
       return symbol_location.range;
     }
 
-    private void on_textDocument_rename(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_rename(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var rename_params = variant_to_object<RenameParams>(@params);
 
@@ -875,7 +991,7 @@ namespace Vls
       client.reply(id, object_to_variant(workspace_edit));
     }
 
-    private WorkspaceEdit? handle_rename(RenameParams rename_params)
+    private WorkspaceEdit? handle_rename(RenameParams rename_params) throws Error
     {
       Vala.Symbol? symbol = find_symbol_by_position(rename_params.textDocument, rename_params.position);
       if (symbol == null)
@@ -924,7 +1040,7 @@ namespace Vls
       return find_symbol.references;
     }
 
-    private void on_textDocument_documentSymbol(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_textDocument_documentSymbol(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var document_symbol_params = variant_to_object<DocumentSymbolParams>(@params);
 
@@ -941,7 +1057,7 @@ namespace Vls
       client.reply(id, result);
     }
 
-    private JsonSerializableCollection<DocumentSymbol>? handle_documentSymbol(DocumentSymbolParams document_symbol_params)
+    private JsonSerializableCollection<DocumentSymbol>? handle_documentSymbol(DocumentSymbolParams document_symbol_params) throws Error
     {
       TextDocumentIdentifier textDocument = document_symbol_params.textDocument;
 
@@ -949,15 +1065,12 @@ namespace Vls
       if (loginfo) info(@"Searching symbols, uri ($(uri))");
 
       SourceFile? source_file = get_source_file(uri);
-      if (source_file == null)
-      {
-        return null;
-      }
+      if (source_file == null) return null;
 
       return get_document_symbols(source_file);
     }
 
-    private void on_shutdown(Jsonrpc.Client client, string method, Variant id, Variant @params)
+    private void on_shutdown(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       context.clear();
       client.reply(id, null);
@@ -980,10 +1093,17 @@ namespace Vls
       return Json.gvariant_deserialize(node, null);
     }
 
-    private static Json.Node parse_json(string json)
+    private static Json.Node parse_json(string json) throws Error
     {
       var parser = new Json.Parser.immutable_new();
       parser.load_from_data(json);
+      return parser.get_root();
+    }
+
+    private static Json.Node parse_json_file(string filename) throws Error
+    {
+      var parser = new Json.Parser.immutable_new();
+      parser.load_from_file(filename);
       return parser.get_root();
     }
 
@@ -992,17 +1112,20 @@ namespace Vls
       return filename.has_suffix(".vapi") || filename.has_suffix(".vala") || filename.has_suffix(".gs");
     }
 
-    private SourceFile? get_source_file(string uri)
+    private SourceFile? get_source_file(string uri) throws Error
     {
       if (!uri.has_prefix("file:"))
       {
         return null;
       }
+
       SourceFile? source_file = context.get_source_file(uri);
       if (source_file == null)
       {
-        throw new Error.FAILED(@"Cannot get source file: $(uri)");
+        if (logwarn) warning(@"Cannot get source file: $(uri)");        
+        return null;
       }
+
       return source_file;
     }
   }

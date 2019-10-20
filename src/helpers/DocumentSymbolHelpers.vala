@@ -1,6 +1,6 @@
 namespace Vls
 {
-  JsonSerializableCollection<DocumentSymbol>? get_document_symbols(SourceFile source_file)
+  JsonSerializableCollection<DocumentSymbol>? get_document_symbols(SourceFile source_file) throws Error
   {
     Gee.Set<Vala.Symbol> symbols = find_symbols_in_file(source_file);
 
@@ -8,7 +8,7 @@ namespace Vls
     foreach (Vala.Symbol symbol in symbols)
     {
       if (logdebug) debug(@"Process symbol ($(code_node_to_string (symbol)))");
-      DocumentSymbol? document_symbol = add_document_symbol_to_map(symbol, document_symbol_map);
+      add_document_symbol_to_map(symbol, document_symbol_map);
     }
 
     JsonSerializableCollection<DocumentSymbol> document_symbols = null;
@@ -42,7 +42,7 @@ namespace Vls
     }
   }
 
-  DocumentSymbol add_document_symbol_to_map(Vala.Symbol symbol, Gee.HashMap<Vala.Symbol, DocumentSymbol> document_symbol_map)
+  DocumentSymbol? add_document_symbol_to_map(Vala.Symbol symbol, Gee.HashMap<Vala.Symbol, DocumentSymbol> document_symbol_map) throws Error
   {
     DocumentSymbol? document_symbol = document_symbol_map.get(symbol);
     if (document_symbol == null)
@@ -55,14 +55,14 @@ namespace Vls
         {
           return null;
         }
-        if (logdebug) debug(@"created parent document symbol: $(symbol.parent_symbol.name) ($(ptr_to_string (symbol.parent_symbol)), $(symbol.parent_symbol.type_name))");
+        if (logdebug) debug(@"created parent document symbol: $(symbol.parent_symbol.name) ($(symbol.parent_symbol.type_name))");
       }
       document_symbol = symbol_to_document_symbol(symbol);
       if (document_symbol == null)
       {
         return null;
       }
-      if (logdebug) debug(@"created document symbol: $(symbol.name) ($(ptr_to_string (symbol)), $(symbol.type_name))");
+      if (logdebug) debug(@"created document symbol: $(symbol.name) ($(symbol.type_name))");
       if (parent_document_symbol != null)
       {
         parent_document_symbol.children.add(document_symbol);
@@ -72,7 +72,7 @@ namespace Vls
     return document_symbol;
   }
 
-  DocumentSymbol? symbol_to_document_symbol(Vala.Symbol symbol)
+  DocumentSymbol? symbol_to_document_symbol(Vala.Symbol symbol) throws Error
   {
     var document_symbol = new DocumentSymbol();
 

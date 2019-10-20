@@ -10,7 +10,7 @@ namespace Vls
     public Vala.SourceFile file = null;
     public bool has_diagnostics = false;
 
-    public SourceFile(string filename, string uri, bool external, int version = 0) throws ConvertError
+    public SourceFile(string filename, string uri, bool external, int version = 0) throws Error
     {
       this.filename = filename;
       this.uri = uri;
@@ -22,12 +22,12 @@ namespace Vls
       FileUtils.get_contents(filename, out content);
     }
 
-    public SourceFile.from_internal(string filename, string uri, int version = 0) throws ConvertError
+    public SourceFile.from_internal(string filename, string uri, int version = 0) throws Error
     {
       this(filename, uri, false, version);
     }
 
-    public SourceFile.from_external(string filename, string uri, int version = 0) throws ConvertError
+    public SourceFile.from_external(string filename, string uri, int version = 0) throws Error
     {
       this(filename, uri, true, version);
     }
@@ -115,7 +115,7 @@ namespace Vls
       source_files.clear();
     }
 
-    public Reporter check()
+    public Reporter check() throws Error
     {
       if (code_context != null)
       {
@@ -150,7 +150,7 @@ namespace Vls
       return reporter;
     }
 
-    private void build_code_context(Vala.CodeContext code_context, Reporter reporter)
+    private void build_code_context(Vala.CodeContext code_context, Reporter reporter) throws Error
     {
       reporter.enable_warnings = !disable_warnings;
       code_context.report = reporter;

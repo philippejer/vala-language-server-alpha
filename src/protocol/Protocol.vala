@@ -17,6 +17,56 @@ namespace Vls
     RequestCancelled = -32800,
     ContentModified = -32801,
   }
+  
+  class InitializeParams : AbstractJsonSerializableObject
+  {
+    /**
+     * The process Id of the parent process that started
+     * the server. Is null if the process has not been started by another process.
+     * If the parent process is not alive then the server should exit (see exit notification) its process.
+     */
+    //  int processId;
+  
+    /**
+     * The rootPath of the workspace. Is null
+     * if no folder is open.
+     *
+     * @deprecated in favour of rootUri.
+     */
+    //  string rootPath;
+  
+    /**
+     * The rootUri of the workspace. Is null if no
+     * folder is open. If both `rootPath` and `rootUri` are set
+     * `rootUri` wins.
+     */
+    public string rootUri { get; set; }
+  
+    /**
+     * User provided initialization options.
+     */
+    //  initializationOptions?: any;
+  
+    /**
+     * The capabilities provided by the client (editor or tool)
+     */
+    //  capabilities: ClientCapabilities;
+  
+    /**
+     * The initial trace setting. If omitted trace is disabled ('off').
+     */
+    //  trace?: 'off' | 'messages' | 'verbose';
+  
+    /**
+     * The workspace folders configured in the client when the server starts.
+     * This property is only available if the client supports workspace folders.
+     * It can be `null` if the client supports workspace folders but none are
+     * configured.
+     *
+     * Since 3.6.0
+     */
+    //  workspaceFolders?: WorkspaceFolder[] | null;
+  }
 
   class InitializeResult : AbstractJsonSerializableObject
   {

@@ -15,7 +15,7 @@ namespace Vls
     logwarn = (debug_level >= DebugLevel.WARN);
 
     var loop = new MainLoop();
-    server = new Server(loop);
+    vls_server = new Server(loop);
     loop.run();
   }
 

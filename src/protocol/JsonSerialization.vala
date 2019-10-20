@@ -7,7 +7,7 @@ namespace Vls
       return false;
     }
 
-    public virtual Json.Node serialize_property(string property_name, Value @value, ParamSpec pspec)
+    public virtual Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
     {
       // Serialize primitive types explicitly otherwise zero values are ignored for some reason...
       if (pspec.value_type.is_a(typeof(int)))
@@ -61,7 +61,7 @@ namespace Vls
         JsonSerializableValue val = create_value(pspec.value_type, property_name);
         if (val.deserialize(property_node))
         {
-          value = new Value(pspec.value_type);
+          value = Value(pspec.value_type);
           value.set_object(val);
         }
         return true;
@@ -185,11 +185,7 @@ namespace Vls
         }
         else if (element_type.is_a(typeof(string)))
         {
-          if (node.is_null())
-          {
-            ((JsonSerializableCollection<string>)list).add(null);
-          }
-          else
+          if (!node.is_null())
           {
             ((JsonSerializableCollection<string>)list).add(node.get_string());
           }
@@ -322,11 +318,7 @@ namespace Vls
         }
         else if (value_type.is_a(typeof(string)))
         {
-          if (node.is_null())
-          {
-            ((JsonSerializableMap<string>)map).set(name, null);
-          }
-          else
+          if (!node.is_null())
           {
             ((JsonSerializableMap<string>)map).set(name, node.get_string());
           }

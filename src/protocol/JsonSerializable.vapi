@@ -13,7 +13,7 @@ namespace Vls
     [CCode(array_length_pos = 0.1, array_length_type = "guint")]
     public (unowned GLib.ParamSpec)[] list_properties();
     public Json.Node default_serialize_property(string property_name, GLib.Value value, GLib.ParamSpec pspec);
-    public virtual Json.Node serialize_property(string property_name, GLib.Value value, GLib.ParamSpec pspec);
+    public virtual Json.Node? serialize_property(string property_name, GLib.Value value, GLib.ParamSpec pspec);
     public bool default_deserialize_property(string property_name, ref GLib.Value value, GLib.ParamSpec pspec, Json.Node property_node);
     public virtual bool deserialize_property(string property_name, ref GLib.Value value, GLib.ParamSpec pspec, Json.Node property_node);
   }

@@ -40,7 +40,7 @@ namespace Vls
   }
 
   /** Searches for 'token' between 'begin' and 'max' ('max' excluded from search). */
-  char* find_token(char* begin, char* max, char token)
+  char* _find_token(char* begin, char* max, char token)
   {
     char* pos = begin;
     while (pos < max)
@@ -79,11 +79,11 @@ namespace Vls
     var symbol = node as Vala.Symbol;
     if (symbol != null && symbol.name != null)
     {
-      return @"$(symbol.name) ($(node.type_name)) ($(ptr_to_string(node))) ($(source_reference_to_string(node.source_reference)))";
+      return @"$(symbol.name) ($(node.type_name)) ($(source_reference_to_string(node.source_reference)))";
     }
     else
     {
-      return @"$(ptr_to_string(node)) ($(node.type_name)) ($(source_reference_to_string(node.source_reference)))";
+      return @"[unnamed] ($(node.type_name)) ($(source_reference_to_string(node.source_reference)))";
     }
   }
 
@@ -97,11 +97,11 @@ namespace Vls
     var symbol = node as Vala.Symbol;
     if (symbol != null && symbol.name != null)
     {
-      return @"$(symbol.name) ($(node.type_name)) ($(ptr_to_string(node))) ($(source_reference_to_string(node.source_reference))) $(symbol_scope_to_string(symbol))";
+      return @"$(symbol.name) ($(node.type_name)) ($(source_reference_to_string(node.source_reference))) $(symbol_scope_to_string(symbol))";
     }
     else
     {
-      return @"$(ptr_to_string(node)) ($(node.type_name)) ($(source_reference_to_string(node.source_reference)))";
+      return @"[unnamed] ($(node.type_name)) ($(source_reference_to_string(node.source_reference)))";
     }
   }
 
@@ -194,7 +194,6 @@ namespace Vls
     char* begin = method.source_reference.begin.pos;
     char* max = method.source_reference.file.get_mapped_contents() + method.source_reference.file.get_mapped_length();
     char* pos = find_text_between_parens(begin, max);
-    //  char* pos = find_token(begin, max, ')');
     char* end = pos == null ? method.source_reference.end.pos : pos + 1;
     return get_string_from_pointers(begin, end);
   }
@@ -221,6 +220,24 @@ namespace Vls
       pos += 1;
     }
     return pos == max ? null : pos;
+  }
+
+  /** Searches for 'word' as a "whole word" between 'begin' and 'max' ('max' is excluded from search). */
+  char* _find_word(char* begin, char* max, string word)
+  {
+    char* pos = begin;
+    int word_length = word.length;
+    char* end = max - word_length + 1;
+    while (pos < end)
+    {
+      bool is_candidate = (pos == begin || !pos[-1].isalnum()) && (pos == (end - 1) || !pos[word_length].isalnum());
+      if (is_candidate && equal_strings(pos, (char*)word, word_length))
+      {
+        break;
+      }
+      pos += 1;
+    }
+    return pos == end ? null : pos;
   }
 
   /** Returns the symbol referenced by 'node' (if any). */
@@ -266,8 +283,8 @@ namespace Vls
   }
 
   /** Converts a 'SourceReference' to a 'Location'. */
-  Location source_reference_to_location(Vala.SourceReference source_reference)
-  {
+  Location source_reference_to_location(Vala.SourceReference source_reference) throws Error
+  {     
     return new Location()
     {
       uri = Filename.to_uri(source_reference.file.filename),
@@ -297,7 +314,7 @@ namespace Vls
    * Searches for 'identifier' as a "whole word" inside the source of 'node' and returns the location of that identifier.
    * If 'strict' is not set, the location of 'node' is returned if the identifier could not be found (should not happen normally).
    */
-  Location? get_identifier_location(Vala.CodeNode node, string identifier, bool strict)
+  Location? get_identifier_location(Vala.CodeNode node, string identifier, bool strict) throws Error
   {
     if (node.source_reference == null)
     {
@@ -306,7 +323,7 @@ namespace Vls
     }
     Location location = source_reference_to_location(node.source_reference);
     string source = get_code_node_source(node);
-    if (!find_identifier_location(location.range, source, identifier))
+    if (!find_identifier_range(location.range, source, identifier))
     {
       if (loginfo) info(@"Could not find identifier ($(source)) in source ($(identifier))");
       if (strict)
@@ -321,7 +338,7 @@ namespace Vls
    * Searches for 'identifier' as a "whole word" inside 'source' and updates 'range' accordingly if the identifier is found.
    * Returns true if 'identifier' is found inside 'source'.
    */
-  bool find_identifier_location(Range range, string source, string identifier)
+  bool find_identifier_range(Range range, string source, string identifier)
   {
     int source_length = source.length;
     int identifier_length = identifier.length;
@@ -393,5 +410,18 @@ namespace Vls
       index += 1;
     }
     return index;
+  }
+
+  /** Check C-strings for equality. */
+  bool equal_strings(char* s1, char* s2, int length)
+  {
+    for (int i = 0; i < length; i++)
+    {
+      if (s1[i] != s2[i])
+      {
+        return false;
+      }
+    }
+    return true;
   }
 }

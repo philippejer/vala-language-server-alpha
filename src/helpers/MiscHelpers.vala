@@ -1,8 +1,8 @@
 namespace Vls
 {
-  delegate void Action();
+  delegate void Action() throws Error;
 
-  void debug_action_time(string label, Action action)
+  void debug_action_time(string label, Action action) throws Error
   {
     var timer = new Timer();
     timer.start();
@@ -36,22 +36,33 @@ namespace Vls
   int64 get_time_us()
   {
     return get_monotonic_time();
-  }
+  }  
 
-  string ptr_to_string(void* ptr)
-  {
-    return "%#llx".printf(ptr);
-  }
+  //  delegate T ThrowsFunc<T>() throws Error;
 
-  bool equal_strings(char* s1, char* s2, int length)
-  {
-    for (int i = 0; i < length; i++)
-    {
-      if (s1[i] != s2[i])
-      {
-        return false;
-      }
-    }
-    return true;
-  }
+  //  T check_func_error<T>(ThrowsFunc func)
+  //  {
+  //    try
+  //    {
+  //      return func();
+  //    }
+  //    catch (Error err)
+  //    {
+  //      error("Unexpected error: %s", err.message);
+  //    }
+  //  }
+
+  //  delegate void ThrowsAction() throws Error;
+
+  //  void check_action_error(ThrowsAction action)
+  //  {
+  //    try
+  //    {
+  //      action();
+  //    }
+  //    catch (Error err)
+  //    {
+  //      error("Unexpected error: %s", err.message);
+  //    }
+  //  }
 }

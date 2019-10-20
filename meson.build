@@ -46,7 +46,7 @@ endif
 
 add_project_arguments([
 		'--enable-gobject-tracing', 
-		'--disable-warnings',
+		# '--disable-warnings',
 	], language: 'vala')
 
 buildtype = get_option('buildtype')
