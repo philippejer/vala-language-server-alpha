@@ -81,6 +81,7 @@ namespace Vls
       }
     }
 
+#if LIBVALA_EXPERIMENTAL
     public override void suppr_err(Vala.SourceReference? source, string message)
     {
       if (source == null)
@@ -92,6 +93,7 @@ namespace Vls
         add_source_error(source, message, ref errors_by_file);
       }
     }
+#endif
 
     private static void add_source_error(Vala.SourceReference source, string message, ref Gee.HashMap<string, Gee.ArrayList<SourceError>> errors_by_file)
     {
