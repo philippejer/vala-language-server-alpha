@@ -60,6 +60,7 @@ namespace Vls
     public bool exp_optional_semicolons { get; set; default = false; }
     public bool exp_optional_parens { get; set; default = false; }
     public bool exp_conditional_attribute { get; set; default = false; }
+    public bool exp_forbid_delegate_copy { get; set; default = false; }
 #endif
 
     public Context()
@@ -161,6 +162,7 @@ namespace Vls
       code_context.exp_optional_semicolons = exp_optional_semicolons;
       code_context.exp_optional_parens = exp_optional_parens;
       code_context.exp_conditional_attribute = exp_conditional_attribute;
+      code_context.exp_forbid_delegate_copy = exp_forbid_delegate_copy;
 
       // This flag allows the parser to continue on trivial syntax errors
       code_context.exp_resilient_parser = true;

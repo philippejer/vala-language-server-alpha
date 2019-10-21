@@ -33,41 +33,6 @@ namespace Vls
     const int64 publish_diagnostics_delay_max_us = 1000 * 1000;
     const int monitor_file_period_ms = 2500;
 
-    static Regex package_regex;
-    static Regex vapidir_regex;
-    static Regex define_regex;
-    static Regex disable_warnings_regex;
-
-#if LIBVALA_EXPERIMENTAL
-    static Regex exp_public_by_default_regex;
-    static Regex exp_float_by_default_regex;
-    static Regex exp_optional_semicolons_regex;
-    static Regex exp_optional_parens_regex;
-    static Regex exp_conditional_attribute_regex;
-#endif
-
-    static construct
-    {
-      try
-      {
-        package_regex = new Regex("--pkg[= ](\\S+)");
-        vapidir_regex = new Regex("--vapidir[= ](\\S+)");
-        define_regex = new Regex("(?:(?:--define[= ])|(?:-D ))(\\S+)");
-        disable_warnings_regex = new Regex("--disable-warnings");
-#if LIBVALA_EXPERIMENTAL
-        exp_public_by_default_regex = new Regex("--exp-public-by-default");
-        exp_float_by_default_regex = new Regex("--exp-float-by-default");
-        exp_optional_semicolons_regex = new Regex("--exp-optional-semicolons");
-        exp_optional_parens_regex = new Regex("--exp-optional-parens");
-        exp_conditional_attribute_regex = new Regex("--exp-conditional-attribute");
-#endif
-      }
-      catch (Error err)
-      {
-        error(@"Unexpected error: $(err.message)");
-      }
-    }
-
     MainLoop loop;
     Context context;
     Jsonrpc.Server server;
@@ -504,7 +469,7 @@ namespace Vls
       if (is_source_file(absolute_filename))
       {
         string uri = sanitize_file_uri(Filename.to_uri(absolute_filename));
-        if (loginfo) info(@"Adding source file ($(filename)) ($(uri))");
+        if (loginfo) info(@"Found source file ($(filename)) ($(uri))");
         var source_file = new SourceFile.from_internal(filename, uri);
         context.add_source_file(source_file);
       }
@@ -516,74 +481,80 @@ namespace Vls
 
       MatchInfo match_info;
 
-      if (package_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--pkg[= ](\S+)/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
         do
         {
           string package = match_info.fetch(1);
-          if (loginfo) info(@"Adding package ($(package))");
+          if (loginfo) info(@"Found package ($(package))");
           context.add_package(package);
         }
         while (match_info.next());
       }
 
-      if (vapidir_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--vapidir[= ](\S+)/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
         do
         {
           string vapi_directory = match_info.fetch(1);
-          if (loginfo) info(@"Adding vapi directory ($(vapi_directory))");
+          if (loginfo) info(@"Found vapi directory ($(vapi_directory))");
           context.add_vapi_directory(vapi_directory);
         }
         while (match_info.next());
       }
 
-      if (define_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/(?:(?:--define[= ])|(?:-D ))(\S+)/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
         do
         {
           string define = match_info.fetch(1);
-          if (loginfo) info(@"Adding define ($(define))");
+          if (loginfo) info(@"Found define ($(define))");
           context.add_define(define);
         }
         while (match_info.next());
       }
 
-      if (disable_warnings_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--disable-warnings/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
-        if (loginfo) info("Setting disable warnings flag");
+        if (loginfo) info("Found --disable-warnings flag");
         context.disable_warnings = true;
       }
 
 #if LIBVALA_EXPERIMENTAL
-      if (exp_public_by_default_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--exp-public-by-default/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
-        if (loginfo) info("Setting public by default flag");
+        if (loginfo) info("Found --exp-public-by-default flag");
         context.exp_public_by_default = true;
       }
 
-      if (exp_float_by_default_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--exp-float-by-default/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
-        if (loginfo) info("Setting float by default flag");
+        if (loginfo) info("Found --exp-float-by-default flag");
         context.exp_float_by_default = true;
       }
 
-      if (exp_optional_semicolons_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--exp-optional-semicolons/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
-        if (loginfo) info("Setting optional semicolons flag");
+        if (loginfo) info("Found --exp-optional-semicolons flag");
         context.exp_optional_semicolons = true;
       }
 
-      if (exp_optional_parens_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--exp-optional-parens/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
-        if (loginfo) info("Setting optional parens flag");
+        if (loginfo) info("Found --exp-optional-parens flag");
         context.exp_optional_parens = true;
       }
 
-      if (exp_conditional_attribute_regex.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      if (/--exp-conditional-attribute/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
-        if (loginfo) info("Setting conditional attribute flag");
+        if (loginfo) info("Found --exp-conditional-attribute flag");
         context.exp_conditional_attribute = true;
+      }
+
+      if (/--exp-forbid-delegate-copy/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Found --exp-forbid-delegate-copy flag");
+        context.exp_forbid_delegate_copy = true;
       }
 #endif
     }
