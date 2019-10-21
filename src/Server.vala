@@ -413,7 +413,7 @@ namespace Vls
       Json.Node targets_node = parse_json(targets_json);
       if (logdebug) debug(@"targets ($(Json.to_string(targets_node, true)))");
 
-      bool has_target = false;
+      bool has_executable_target = false;
       Json.Array targets_array = targets_node.get_array();
       for (int i = 0; i < targets_array.get_length(); i++)
       {
@@ -422,12 +422,21 @@ namespace Vls
         string target_type = target_object.get_string_member("type");
         if (loginfo) info(@"target ($(target_name)) ($(target_type))");
 
-        if (has_target)
+        if (target_type != "executable" && !target_type.has_suffix("library"))
         {
-          if (logwarn) warning(@"Multiple Vala targets found in Meson build file, only the first target will be added, additional target '$(target_name)' ($(target_type)) ignored");
-          return;
+          if (loginfo) info(@"Target is not an executable target and will be ignored: '$(target_name)' ($(target_type))");
+          continue;
         }
-        has_target = true;
+
+        if (target_type == "executable")
+        {
+          if (has_executable_target)
+          {
+            if (logwarn) warning(@"Multiple executable targets found in Meson build file, additional executable target will be ignored: '$(target_name)' ($(target_type)) ignored");
+            continue;
+          }
+          has_executable_target = true;
+        }
 
         Json.Array target_sources_array = target_object.get_array_member("target_sources");
         for (int j = 0; j < target_sources_array.get_length(); j++)
@@ -437,7 +446,7 @@ namespace Vls
           string language = target_source_object.get_string_member("language");
           if (language != "vala")
           {
-            return;
+            continue;
           }
 
           if (target_source_object.has_member("parameters"))
