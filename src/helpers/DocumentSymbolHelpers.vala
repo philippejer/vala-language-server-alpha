@@ -129,9 +129,17 @@ namespace Vls
         extend_ranges(document_symbol.range, source_reference_to_range(destructor.body.source_reference));
       }
     }
-    else if (symbol is Vala.Class || symbol is Vala.Struct)
+    else if (symbol is Vala.Delegate)
+    {
+      document_symbol.kind = SymbolKind.Interface;
+    }
+    else if (symbol is Vala.Class)
     {
       document_symbol.kind = SymbolKind.Class;
+    }
+    else if (symbol is Vala.Struct)
+    {
+      document_symbol.kind = SymbolKind.Struct;
     }
     else if (symbol is Vala.Enum || symbol is Vala.ErrorDomain)
     {
