@@ -144,9 +144,10 @@ namespace Vls
         }
         catch (Error err)
         {
-          warning(@"Uncaught error ($(err.message)))");
+          warning(@"Uncaught error: $(err.message))");
           warning("Consider using the 'Restart server' command (VSCode) to restart if this is a transient error");
-          return false;
+          client.reply_error_async.begin(id, ErrorCodes.InternalError, err.message, null);
+          return true;
         }
       });
 
@@ -175,30 +176,30 @@ namespace Vls
       string? config_file = find_file_in_dir(root_path, "vala-language-server.json");
       if (config_file != null)
       {
-        analyze_config_file(root_path, config_file);    
+        analyze_config_file(root_path, config_file);
 
         // Analyze again when the file changes
         monitor_file(config_file, false, () =>
         {
           if (loginfo) info("Config file has changed, reanalyzing...");
-          analyze_config_file(root_path, config_file);    
+          analyze_config_file(root_path, config_file);
           request_publishDiagnostics(client);
         });
       }
-      else      
+      else
       {
         string? meson_file = find_file_in_dir(root_path, "meson.build");
         if (meson_file == null)
         {
-          throw new VlsError.FAILED(@"Cannot find Meson build file 'meson.build' under root path ($(root_path))");
+          throw new VlsError.FAILED(@"Cannot find Meson build file 'meson.build' under root path ($(root_path)).");
         }
         string? ninja_file = find_file_in_dir(root_path, "build.ninja");
         if (ninja_file == null)
         {
-          throw new VlsError.FAILED(@"Cannot find Ninja build file 'build.ninja' under root path ($(root_path))");
+          throw new VlsError.FAILED(@"Cannot find Ninja build file 'build.ninja' under root path ($(root_path)).");
         }
         string build_dir = Path.get_dirname(ninja_file);
-        analyze_meson_build(root_path, build_dir);      
+        analyze_meson_build(root_path, build_dir);
 
         // Analyze again when the file changes
         monitor_file(ninja_file, false, () =>
@@ -209,43 +210,36 @@ namespace Vls
         });
       }
 
-      try
+      var completionCharacters = new JsonArrayList<string>.wrap(new string[] { "." });
+      var signatureHelpCharacters = new JsonArrayList<string>.wrap(new string[] { "(" });
+      var capabilities = new ServerCapabilities()
       {
-        var completionCharacters = new JsonArrayList<string>.wrap(new string[] { "." });
-        var signatureHelpCharacters = new JsonArrayList<string>.wrap(new string[] { "(" });
-        var capabilities = new ServerCapabilities()
+        textDocumentSync = new TextDocumentSyncOptions()
         {
-          textDocumentSync = new TextDocumentSyncOptions()
-          {
-            change = TextDocumentSyncKind.Incremental
-          },
-          definitionProvider = true,
-          hoverProvider = true,
-          completionProvider = new CompletionOptions()
-          {
-            triggerCharacters = completionCharacters
-          },
-          signatureHelpProvider = new SignatureHelpOptions()
-          {
-            triggerCharacters = signatureHelpCharacters
-          },
-          referencesProvider = true,
-          renameProvider = new RenameOptions()
-          {
-            prepareProvider = true
-          },
-          documentSymbolProvider = true
-        };
-        var result = new InitializeResult()
+          change = TextDocumentSyncKind.Incremental
+        },
+        definitionProvider = true,
+        hoverProvider = true,
+        completionProvider = new CompletionOptions()
         {
-          capabilities = capabilities
-        };
-        client.reply(id, object_to_variant(result));
-      }
-      catch (Error err)
+          triggerCharacters = completionCharacters
+        },
+        signatureHelpProvider = new SignatureHelpOptions()
+        {
+          triggerCharacters = signatureHelpCharacters
+        },
+        referencesProvider = true,
+        renameProvider = new RenameOptions()
+        {
+          prepareProvider = true
+        },
+        documentSymbolProvider = true
+      };
+      var result = new InitializeResult()
       {
-        throw new VlsError.FAILED(@"Failed to reply to client ($(err.message)))");
-      }
+        capabilities = capabilities
+      };
+      client.reply(id, object_to_variant(result));
 
       send_publishDiagnostics(client);
     }
@@ -322,35 +316,31 @@ namespace Vls
       }
       catch (Error err)
       {
-        warning(@"Could not parse ($(config_file)) as JSON: $(err.message)");
-        return;
+        throw new VlsError.FAILED(@"Could not parse ($(config_file)) as JSON: $(err.message).");
       }
       if (logdebug) debug(@"config ($(Json.to_string(config_node, true)))");
 
       if (config_node.get_node_type() != Json.NodeType.OBJECT)
       {
-        warning(@"Config file ($(config_file)) root node is not an object");
-        return;
+        throw new VlsError.FAILED(@"Config file ($(config_file)) root node is not an object.");
       }
       Json.Object config_object = config_node.get_object();
 
       if (!config_object.has_member("sources"))
       {
-        if (logwarn) warning(@"Config file ($(config_file)) does not have a \"sources\" element, this is probably not right");
-        return;
+        throw new VlsError.FAILED(@"Config file ($(config_file)) does not have a \"sources\" element, this is probably not right.");
       }
 
       Json.Array sources_array = config_object.get_array_member("sources");
       for (int k = 0; k < sources_array.get_length(); k++)
       {
-        string filename = sources_array.get_string_element(k);      
+        string filename = sources_array.get_string_element(k);
         add_source_file(rootdir, filename);
       }
 
       if (!config_object.has_member("parameters"))
       {
-        if (logwarn) warning(@"Config file ($(config_file)) does not have a \"parameters\" element, this is probably not right");
-        return;
+        throw new VlsError.FAILED(@"Config file ($(config_file)) does not have a \"parameters\" element, this is probably not right.");
       }
 
       string parameters = config_object.get_string_member("parameters");
@@ -367,17 +357,31 @@ namespace Vls
       string meson_command = string.joinv(" ", spawn_args);
       if (loginfo) info(@"Meson introspect command ($(meson_command))");
       Process.spawn_sync(root_path, spawn_args, null, SpawnFlags.SEARCH_PATH, null, out proc_stdout, out proc_stderr, out proc_status);
+
       if (proc_status != 0)
       {
-        throw new VlsError.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout)))");
+        throw new VlsError.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout))).");
       }
 
       // Clear context since it will be repopulated from the targets
       context.clear();
 
-      string targets_json = proc_stdout;
-      Json.Node targets_node = parse_json(targets_json);
-      if (logdebug) debug(@"targets ($(Json.to_string(targets_node, true)))");
+      string targets_json = proc_stdout.replace("\r", "");
+      if (logdebug) debug(@"Meson intropect command successful ($(targets_json))");
+      
+      Json.Node targets_node;
+      try
+      {
+        targets_node = parse_json(targets_json);
+      }
+      catch (Error err)
+      {
+        throw new VlsError.FAILED(@"Could not parse Meson result as JSON: $(err.message), please activate the debug logs and check the result from Meson.");
+      }
+      if (targets_node.get_node_type() != Json.NodeType.ARRAY)
+      {
+        throw new VlsError.FAILED(@"Meson did not return an array of targets, please activate the debug logs and check the result from Meson.");
+      }
 
       bool has_executable_target = false;
       Json.Array targets_array = targets_node.get_array();
@@ -386,7 +390,7 @@ namespace Vls
         Json.Object target_object = targets_array.get_object_element(i);
         string target_name = target_object.get_string_member("name");
         string target_type = target_object.get_string_member("type");
-        if (loginfo) info(@"target ($(target_name)) ($(target_type))");
+        if (loginfo) info(@"Meson target ($(target_name)) ($(target_type))");
 
         if (target_type != "executable" && !target_type.has_suffix("library"))
         {
@@ -419,7 +423,7 @@ namespace Vls
           {
             Json.Array parameters_array = target_source_object.get_array_member("parameters");
             string[] parameters = new string[parameters_array.get_length()];
-            parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());            
+            parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());
             string compiler_parameters = string.joinv(" ", parameters);
             parse_compiler_parameters(compiler_parameters);
           }
@@ -451,7 +455,7 @@ namespace Vls
     }
 
     private void parse_compiler_parameters(string parameters) throws Error
-    {      
+    {
       if (loginfo) info(@"Compiler parameters ($(parameters))");
 
       MatchInfo match_info;
@@ -551,7 +555,7 @@ namespace Vls
 
       if (language != "vala" && language != "genie")
       {
-        throw new VlsError.FAILED(@"Unsupported language ($(language))) sent to Vala Language Server");
+        throw new VlsError.FAILED(@"Unsupported language ($(language))) sent to Vala Language Server.");
       }
     }
 
@@ -1078,7 +1082,7 @@ namespace Vls
         {
           info(@"Source file is not part of the current analysis context ($(uri)).");
           info(@"If this file is supposed to belong to the current project, check that the build file has been found and analyzed correctly.");
-        }  
+        }
         return null;
       }
 
