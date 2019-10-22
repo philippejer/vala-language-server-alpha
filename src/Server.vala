@@ -479,7 +479,7 @@ namespace Vls
       {
         string uri = sanitize_file_uri(Filename.to_uri(absolute_filename));
         if (loginfo) info(@"Found source file ($(filename)) ($(uri))");
-        var source_file = new SourceFile.from_internal(filename, uri);
+        var source_file = new SourceFile(filename, uri);
         context.add_source_file(source_file);
       }
     }
@@ -564,6 +564,12 @@ namespace Vls
       {
         if (loginfo) info("Found --exp-forbid-delegate-copy flag");
         context.exp_forbid_delegate_copy = true;
+      }
+
+      if (/--exp-no-implicit-namespace/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Found --exp-no-implicit-namespace flag");
+        context.exp_no_implicit_namespace = true;
       }
 #endif
     }

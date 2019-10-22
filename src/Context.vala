@@ -4,13 +4,14 @@ namespace Vls
   {
     public string filename;
     public string uri;
+    /** Whether the source file has been added from an external package */
     public bool external;
     public int version;
     public string content;
     public Vala.SourceFile file = null;
     public bool has_diagnostics = false;
 
-    public SourceFile(string filename, string uri, bool external, int version = 0) throws Error
+    public SourceFile(string filename, string uri, bool external = false, int version = 0) throws Error
     {
       this.filename = filename;
       this.uri = uri;
@@ -20,16 +21,6 @@ namespace Vls
       // By default the files are memory mapped by the compiler which seems to cause locking issues on Windows
       // Just read the file contents immediately (the file will need to be fully loaded by the compiler anyway)
       FileUtils.get_contents(filename, out content);
-    }
-
-    public SourceFile.from_internal(string filename, string uri, int version = 0) throws Error
-    {
-      this(filename, uri, false, version);
-    }
-
-    public SourceFile.from_external(string filename, string uri, int version = 0) throws Error
-    {
-      this(filename, uri, true, version);
     }
 
     public void set_file(Vala.SourceFile file)
@@ -61,6 +52,7 @@ namespace Vls
     public bool exp_optional_parens { get; set; default = false; }
     public bool exp_conditional_attribute { get; set; default = false; }
     public bool exp_forbid_delegate_copy { get; set; default = false; }
+    public bool exp_no_implicit_namespace { get; set; default = false; }
 #endif
 
     public Context()
@@ -163,6 +155,7 @@ namespace Vls
       code_context.exp_optional_parens = exp_optional_parens;
       code_context.exp_conditional_attribute = exp_conditional_attribute;
       code_context.exp_forbid_delegate_copy = exp_forbid_delegate_copy;
+      code_context.exp_no_implicit_namespace = exp_no_implicit_namespace;
 
       // This flag allows the parser to continue on trivial syntax errors
       code_context.exp_resilient_parser = true;
@@ -190,7 +183,7 @@ namespace Vls
 
       foreach (SourceFile source_file in source_files.values)
       {
-        // External source files have already been added to the context at this point
+        // Source files which come from external packages do not need to be added explicitly
         if (!source_file.external)
         {
           code_context.add_source_filename(source_file.filename);
@@ -202,14 +195,17 @@ namespace Vls
       {
         unowned string filename = file.filename;
         string uri = sanitize_file_uri(Filename.to_uri(filename));
+
         SourceFile source_file = get_source_file(uri);
+
         if (source_file == null)
         {
-          // Source file was not added from build file analysis, but from an external package
+          // This source file does not come from the build file, which means it comes from an external package
           if (loginfo) info(@"Adding source file from packages ($(filename)) ($(uri))");
-          source_file = new SourceFile.from_external(filename, uri);
+          source_file = new SourceFile(filename, uri, true);
           add_source_file(source_file);
         }
+
         source_file.set_file(file);
       }
     }
