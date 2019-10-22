@@ -1108,7 +1108,11 @@ namespace Vls
       SourceFile? source_file = context.get_source_file(uri);
       if (source_file == null)
       {
-        if (logwarn) warning(@"Cannot get source file: $(uri)");        
+        if (loginfo)
+        {
+          info(@"Source file is not part of the current analysis context ($(uri)).");
+          info(@"If this file is supposed to belong to the current project, check that the build file has been found and analyzed correctly.");
+        }  
         return null;
       }
 
