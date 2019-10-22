@@ -55,14 +55,14 @@ namespace Vls
         {
           return null;
         }
-        if (logdebug) debug(@"created parent document symbol: $(symbol.parent_symbol.name) ($(symbol.parent_symbol.type_name))");
+        if (logdebug) debug(@"created parent document symbol: $(code_node_to_string (symbol.parent_symbol))");
       }
       document_symbol = symbol_to_document_symbol(symbol);
       if (document_symbol == null)
       {
         return null;
       }
-      if (logdebug) debug(@"created document symbol: $(symbol.name) ($(symbol.type_name))");
+      if (logdebug) debug(@"created document symbol: $(code_node_to_string (symbol))");
       if (parent_document_symbol != null)
       {
         parent_document_symbol.children.add(document_symbol);
