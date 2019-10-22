@@ -162,40 +162,6 @@ namespace Vls
         }
         return true;
       });
-
-      test();
-    }
-
-    private void test ()
-    {
-    //    Reporter reporter = null;
-    //    //  analyze_meson_build (null, """d:\devel\workspace\vala-language-server""", """d:\devel\workspace\vala-language-server\build""");
-    //    analyze_meson_build (null, """d:\devel\workspace\test-vala""", """d:\devel\workspace\test-vala\build""");
-    //    //  analyze_meson_build (null, """d:\devel\scratch\test-vala""", """d:\devel\scratch\test-vala\build""");
-    //    debug_action_time ("Check code", () => reporter = context.check ());
-    //    string params_json = """{
-    //      "textDocument": {
-    //          "uri": "file:///d%3A/devel/workspace/test-vala/src/utils/DataUtils.vala"
-    //      },
-    //      "position": {
-    //          "line": 174,
-    //          "character": 24
-    //      },
-    //      "context": {
-    //          "triggerKind": 2,
-    //          "triggerCharacter": "."
-    //      }
-    //  }""";
-    //  Json.Node params_node = parse_json (params_json);
-    //  var @params = (CompletionParams) Json.gobject_deserialize (typeof (CompletionParams), params_node);
-    //  CompletionList? completion_list = handle_completion (@params);
-      
-    //  Json.Node params_node = parse_json (params_json);
-    //  var @params = (CompletionParams) Json.gobject_deserialize (typeof (CompletionParams), params_node);
-    //  CompletionList? completion_list = handle_completion (@params);
-    //  if (logdebug) debug (@"completion_list: ($(completion_list.items.size))");
-    //  var node = Json.gobject_serialize (completion_list);
-    //  if (logdebug) debug (@"node ($(Json.to_string (node, true)))");
     }
 
     private void on_initialize(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
