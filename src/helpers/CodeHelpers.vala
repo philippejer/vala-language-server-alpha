@@ -347,7 +347,7 @@ namespace Vls
     string source = get_code_node_source(node);
     if (!find_identifier_range(location.range, source, identifier))
     {
-      if (loginfo) info(@"Could not find identifier ($(source)) in source ($(identifier))");
+      if (loginfo) info(@"Could not find identifier ($(identifier)) in source ($(source))");
       if (strict)
       {
         return null;
@@ -372,7 +372,7 @@ namespace Vls
     {
       char prev = source[pos - 1];
       char next = source[pos + identifier_length];
-      bool is_candidate = (pos == 0 || !is_identifier_char(prev)) && (pos == (end - 1) || !is_identifier_char(next));
+      bool is_candidate = (pos == 0 || !is_identifier_char(prev) || prev == '@') && (pos == (end - 1) || !is_identifier_char(next));
       if (is_candidate && equal_strings((char*)&source.data[pos], (char*)identifier, identifier_length))
       {
         range.start.line = line;

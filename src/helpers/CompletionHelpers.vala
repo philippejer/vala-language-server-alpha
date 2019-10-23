@@ -230,6 +230,8 @@ namespace Vls
       test_equal_strings("some_method(foo.bar).baz", extract_completion_expression("something + some_method(foo.bar).baz", "something + some_method(foo.bar).baz".length)));
     Test.add_func("/CompletionHelpers/extract_completion_expression/6", () =>
       test_equal_strings("some_method (foo.bar).baz", extract_completion_expression("something + some_method (foo.bar).baz", "something + some_method (foo.bar).baz".length)));
+      Test.add_func("/CompletionHelpers/extract_completion_expression/7", () =>
+        test_equal_strings("some_method (foo.bar).@baz", extract_completion_expression("something + some_method (foo.bar).@baz", "something + some_method (foo.bar).@baz".length)));
   }
 
   /**
