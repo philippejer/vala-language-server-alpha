@@ -40,14 +40,14 @@ namespace Vls
       {
         return;
       }
-      else if (source == null)
+      ++warnings;
+      if (source == null)
       {
         if (logwarn) GLib.warning(@"Non-source deprecation ($(message))");
       }
       else
       {
         add_source_error(source, message, ref notes_by_file);
-        ++warnings;
       }
     }
 
@@ -57,19 +57,20 @@ namespace Vls
       {
         return;
       }
-      else if (source == null)
+      ++warnings;
+      if (source == null)
       {
         if (logwarn) GLib.warning(@"Non-source warning ($(message))");
       }
       else
       {
         add_source_error(source, message, ref warnings_by_file);
-        ++warnings;
       }
     }
 
     public override void err(Vala.SourceReference? source, string message)
     {
+      ++errors;
       if (source == null)
       {
         GLib.error(@"Non-source error ($(message))");
@@ -77,13 +78,13 @@ namespace Vls
       else
       {
         add_source_error(source, message, ref errors_by_file);
-        ++errors;
       }
     }
 
 #if LIBVALA_EXPERIMENTAL
     public override void suppr_err(Vala.SourceReference? source, string message)
     {
+      ++suppr_errors;
       if (source == null)
       {
         GLib.error(@"Non-source error ($(message))");

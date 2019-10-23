@@ -584,7 +584,7 @@ namespace Vls
       {
         if (change.range == null)
         {
-          if (loginfo) info(@"Full text change, filename ($(source_file.filename)), text ($(change.text))");
+          if (loginfo) info(@"Full text change, filename ($(source_file.filename)), text ($(change.text.replace("\r", "")))");
           builder.assign(change.text);
         }
         else
