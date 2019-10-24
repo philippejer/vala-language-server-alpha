@@ -53,13 +53,10 @@ buildtype = get_option('buildtype')
 if buildtype.startswith('debug')
     add_project_arguments(['--define', 'DEBUG'], language: 'vala')
 endif
-if buildtype.startswith('release')
-    add_project_arguments(['--define', 'NDEBUG'], language: 'vala')
-endif
 
 message('vala_version: ' + vala_version)
 if vala_version.endswith('-exp')
-	add_project_arguments(['--define', 'LIBVALA_EXPERIMENTAL'], language: 'vala')
+	add_project_arguments(['--define', 'LIBVALA_EXP'], language: 'vala')
 endif
 
 add_project_arguments(['--pkg=posix'], language: 'vala')
@@ -75,5 +72,5 @@ executable('vala-language-server',
 
 executable('vala-language-server-tests',
 	dependencies: dependencies,
-	sources: [sources, 'src/TestMain.vala'],
+	sources: [sources, 'tests/TestMain.vala'],
 	install: true)

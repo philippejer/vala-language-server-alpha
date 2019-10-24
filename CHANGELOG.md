@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.2
+- Add directory support in config file.
+
 ## 1.0.1
 - Fixed possible infinite loop in the modified Vala parser in "resilient" mode.
   - Only impacts the binary release and people using the modified compiler library.

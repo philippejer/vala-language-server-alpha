@@ -81,7 +81,7 @@ namespace Vls
       }
     }
 
-#if LIBVALA_EXPERIMENTAL
+#if LIBVALA_EXP
     public override void suppr_err(Vala.SourceReference? source, string message)
     {
       ++suppr_errors;

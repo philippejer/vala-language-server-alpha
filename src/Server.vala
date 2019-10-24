@@ -284,9 +284,7 @@ namespace Vls
     private string? find_file_in_dir(string dirname, string target) throws Error
     {
       Dir dir = Dir.open(dirname, 0);
-
-      string name;
-      while ((name = dir.read_name()) != null)
+      for (string name = dir.read_name(); name != null; name = dir.read_name())
       {
         string filepath = Path.build_filename(dirname, name);
         if (name == target)
@@ -335,7 +333,7 @@ namespace Vls
       for (int k = 0; k < sources_array.get_length(); k++)
       {
         string filename = sources_array.get_string_element(k);
-        add_source_file(rootdir, filename);
+        add_source_path(rootdir, filename);
       }
 
       if (!config_object.has_member("parameters"))
@@ -344,7 +342,7 @@ namespace Vls
       }
 
       string parameters = config_object.get_string_member("parameters");
-      parse_compiler_parameters(parameters);
+      parse_compiler_parameters(parameters.replace("\"", ""));
     }
 
     private void analyze_meson_build(string root_path, string build_dir) throws Error
@@ -434,22 +432,32 @@ namespace Vls
             for (int k = 0; k < sources_array.get_length(); k++)
             {
               string filename = sources_array.get_string_element(k);
-              add_source_file(root_path, filename);
+              add_source_path(root_path, filename);
             }
           }
         }
       }
     }
 
-    private void add_source_file(string rootdir, string filename) throws Error
+    private void add_source_path(string rootdir, string filepath) throws Error
     {
-      string absolute_filename = Path.is_absolute(filename) ? filename : Path.build_filename(rootdir, filename);
+      filepath = Path.is_absolute(filepath) ? filepath : Path.build_filename(rootdir, filepath);
 
-      if (is_source_file(absolute_filename))
+      if (FileUtils.test(filepath, FileTest.IS_DIR))
       {
-        string uri = sanitize_file_uri(Filename.to_uri(absolute_filename));
-        if (loginfo) info(@"Found source file ($(filename)) ($(uri))");
-        var source_file = new SourceFile(filename, uri);
+        if (loginfo) info(@"Found source directory ($(filepath))");
+        Dir dir = Dir.open(filepath, 0);
+        for (string name = dir.read_name(); name != null; name = dir.read_name())
+        {
+          string filename = Path.build_filename(filepath, name);
+          add_source_path(rootdir, filename);
+        }
+      }
+      else if (is_source_file(filepath))
+      {
+        string uri = sanitize_file_uri(Filename.to_uri(filepath));
+        if (loginfo) info(@"Found source file ($(filepath)) ($(uri))");
+        var source_file = new SourceFile(filepath, uri);
         context.add_source_file(source_file);
       }
     }
@@ -499,7 +507,7 @@ namespace Vls
         context.disable_warnings = true;
       }
 
-#if LIBVALA_EXPERIMENTAL
+#if LIBVALA_EXP
       if (/--exp-public-by-default/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
       {
         if (loginfo) info("Found --exp-public-by-default flag");

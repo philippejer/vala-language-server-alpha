@@ -45,7 +45,7 @@ namespace Vls
 
     public bool disable_warnings { get; set; default = false; }
 
-#if LIBVALA_EXPERIMENTAL
+#if LIBVALA_EXP
     public bool exp_public_by_default { get; set; default = false; }
     public bool exp_float_by_default { get; set; default = false; }
     public bool exp_optional_semicolons { get; set; default = false; }
@@ -148,7 +148,7 @@ namespace Vls
       reporter.enable_warnings = !disable_warnings;
       code_context.report = reporter;
       
-#if LIBVALA_EXPERIMENTAL
+#if LIBVALA_EXP
       code_context.exp_public_by_default = exp_public_by_default;
       code_context.exp_float_by_default = exp_float_by_default;
       code_context.exp_optional_semicolons = exp_optional_semicolons;

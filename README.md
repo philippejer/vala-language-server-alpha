@@ -12,6 +12,8 @@ I certainly hope to have the time to contribute some PRs there.
 
 Also please note that this tool currently assumes that the client IDE is the latest version of VS Code and that the project is built with Meson 0.50+ (the project must have a valid `meson.build` file). It also should be built against a recent version of Vala due to various improvements and bugfixes made recently (step-by-step Ubuntu and MinGW-64 instructions detailed below).
 
+Update 10 oct 2019: it is now possible to add a simple `vala-language-server.json` file at the root of the project, to configure the source files/directories and the compiler switches (just dump the Vala compiler command line from e.g. `compile_commands.json`).
+
 ## Description
 
 This is a basic language server for the [Vala](https://wiki.gnome.org/Projects/Vala) language, which is relatively limited in scope and mostly tailored to my specific setup (see requirements). I do not intend to polish it much further, however it feels usable enough that I have decided to publish the source code (the current Vala IDEs seem very limited and/or obsolete).
@@ -24,6 +26,7 @@ Currently it has only been "tested" with a specific setup:
 
 - Visual Studio Code as the client IDE (other IDEs might work but I have not tested it)
 - The project should be built with Meson 0.50+, as the language server uses Meson introspection to discover the source files and compiler options (this should be fairly common for current Vala projects)
+- If Meson is not available or does not work, it is possible to use a `vala-language-server.json` config file (see above)
 - The language server depends on Vala 0.46+ to parse and analyze the source files (other versions might work but this is the one I use)
 
 I have written a quick step-by-step guide on [how to compile](#how-to-compile) the language server starting from a vanilla Ubuntu distribution (18.04) and the same with MinGW-64 under Windows.
