@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+- Fixed possible infinite loop in the modified Vala parser in "resilient" mode.
+  - Only impacts the binary release and people using the modified compiler library.
+
+## 1.0.0
+- Version tagged to help with [issue #3](https://github.com/philippejer/vala-language-server-alpha/issues/3).
+- Tentative binary release (MinGW-w64 only ).
+
 ## 2019-10-19
 - Lots of cleanup, code re-organization in sub-folders and helper classes.
 - Many (relatively minor) bugfixes and improvements:
