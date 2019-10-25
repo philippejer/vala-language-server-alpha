@@ -6,7 +6,7 @@
 
 * As explained in the README, the project is expected to use Meson 0.50+ as the build system (the server searches for a `meson.build` file and a `build.ninja` file under the project root or one of its sub-directories).
 
-* Fallback: if the project does not use Meson, it is also possible to create a `vala-language-server.json` at the root of the project ithw the sources and compiler switches. Here is an [example](https://github.com/philippejer/vala-language-server-alpha/blob/master/vala-language-server-test.json).
+* Fallback: if the project does not use Meson or the server fails to use Meson, it is also possible to add a `vala-language-server.json` at the root of the project with the sources and compiler switches. Here is an [example](https://github.com/philippejer/vala-language-server-alpha/blob/72ef038b4873a30d0720dd87839710aeadd5d5ad/vala-language-server-test.json).
 
 * Install the VSCode [extension](https://marketplace.visualstudio.com/items?itemName=philippejer.vala-language-client).
 
