@@ -35,6 +35,7 @@ namespace Vls
 
     MainLoop loop;
     Context context;
+    Reporter reporter;
     Jsonrpc.Server server;
 
     public Server(MainLoop loop)
@@ -636,7 +637,6 @@ namespace Vls
 
     private void send_publishDiagnostics(Jsonrpc.Client client) throws Error
     {
-      Reporter reporter = null;
       debug_action_time("Check context", () => reporter = context.check());
 
       Gee.Collection<SourceFile> source_files = context.get_source_files();
@@ -889,6 +889,12 @@ namespace Vls
     private void on_textDocument_prepareRename(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
+
+      if (reporter == null || reporter.get_errors()  > 0 || reporter.get_suppr_errors() > 0)
+      {        
+        client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, "Cannot rename because of compilation errors", null);
+        return;
+      }
 
       string error_message = "Rename impossible here";
       Range? symbol_range = handle_prepareRename(position_params, ref error_message);
