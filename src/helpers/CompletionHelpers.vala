@@ -503,26 +503,26 @@ namespace Vls
     {
       return false;
     }
-    bool is_type_member = false;
+    bool is_instance_member = false;
     if (symbol is Vala.Field)
     {
       var f = (Vala.Field)symbol;
-      is_type_member = (f.binding != Vala.MemberBinding.CLASS);
+      is_instance_member = (f.binding == Vala.MemberBinding.INSTANCE);
     }
     else if (symbol is Vala.Method)
     {
       var m = (Vala.Method)symbol;
       if (!(m is Vala.CreationMethod))
       {
-        is_type_member = (m.binding != Vala.MemberBinding.CLASS);
+        is_instance_member = (m.binding == Vala.MemberBinding.INSTANCE);
       }
     }
     else if (symbol is Vala.Property)
     {
       var prop = (Vala.Property)symbol;
-      is_type_member = (prop.binding != Vala.MemberBinding.CLASS);
+      is_instance_member = (prop.binding == Vala.MemberBinding.INSTANCE);
     }
-    return is_type_member;
+    return is_instance_member;
   }
 
   /** Returns the ancestor type (root of the class/struct tree) of 'symbol'. */
