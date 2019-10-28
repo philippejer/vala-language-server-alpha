@@ -12,7 +12,7 @@ I certainly hope to have the time to contribute some PRs there.
 
 Also please note that this tool currently assumes that the client IDE is the latest version of VS Code and that the project is built with Meson 0.50+ (the project must have a valid `meson.build` file). It also should be built against a recent version of Vala due to various improvements and bugfixes made recently (step-by-step Ubuntu and MinGW-64 instructions detailed below).
 
-Update 10 oct 2019: it is now possible to add a simple `vala-language-server.json` file at the root of the project, to configure the source files/directories and the compiler switches (just dump the Vala compiler command line from e.g. `compile_commands.json`).
+2019-10-20: A fallback is now available by adding a `vala-language-server.json` configuration file under the project root directory. This file will be detected and used to configure the list of sources files and/or directories and the compiler parameters (it is possible to simply copy the Vala compiler command line from e.g. `compile_commands.json`). An example configuration can be found [here](https://github.com/philippejer/vala-language-server-alpha/blob/master/vala-language-server-test.json).
 
 ## Description
 

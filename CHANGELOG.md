@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+- Fix bug where some static members are not in the completions (e.g. float.max()).
+- Disable rename when there are compiler errors.
+- Add support for auto-insert of parentheses in method completion.
+- Improved "resilient" parser mode with the '-exp' compiler fork (missing identifiers).
+
 ## 1.0.2
 - Add directory support in config file.
 
