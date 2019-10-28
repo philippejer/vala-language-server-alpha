@@ -26,12 +26,15 @@ namespace Vls
   CompletionList? get_completion_list(Context context, SourceFile source_file, Position position) throws Error
   {
     string completion_member;
-    Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, position.line, position.character, out completion_member);
+    int position_index;
+    Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, position.line, position.character, out completion_member, out position_index);
     if (symbols == null)
     {
       return null;
     }
 
+    int non_space_index = skip_source_spaces(source_file.content, position_index);
+    bool is_before_paren = source_file.content[non_space_index] == '(';
     var completion_items = new JsonArrayList<CompletionItem>();
     Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
     for (bool has_next = iter.next(); has_next; has_next = iter.next())
@@ -48,48 +51,30 @@ namespace Vls
         value = @"```vala\n$(code)\n```"
       };
       completion_item.sortText = "%03d:%s".printf(ordered_symbol.order, code);
-      completion_item.insertText = name;
-      completion_item.insertTextFormat = InsertTextFormat.PlainText;
-      if (symbol is Vala.Field)
+      if (method_completion_mode != MethodCompletionMode.OFF && !is_before_paren && (symbol is Vala.Callable))
       {
-        completion_item.kind = CompletionItemKind.Field;
+        completion_item.insertTextFormat = InsertTextFormat.Snippet;
+        string completion_space = method_completion_mode == MethodCompletionMode.SPACE ? " " : "";
+        if (((Vala.Callable)symbol).get_parameters().size > 0)
+        {
+          completion_item.insertText = @"$(name)$(completion_space)($${0})";
+          completion_item.command = new Command()
+          {
+            title = "Trigger Parameter Hints",
+            command = "editor.action.triggerParameterHints"
+          };
+        }
+        else
+        {
+          completion_item.insertText = @"$(name)$(completion_space)()";
+        }
       }
-      if (symbol is Vala.Property)
+      else
       {
-        completion_item.kind = CompletionItemKind.Property;
+        completion_item.insertText = name;
+        completion_item.insertTextFormat = InsertTextFormat.PlainText;
       }
-      if (symbol is Vala.Variable || symbol is Vala.Parameter)
-      {
-        completion_item.kind = CompletionItemKind.Variable;
-      }
-      if (symbol is Vala.Method)
-      {
-        completion_item.kind = CompletionItemKind.Method;
-      }
-      if (symbol is Vala.Delegate)
-      {
-        completion_item.kind = CompletionItemKind.Method;
-      }
-      if (symbol is Vala.Class || symbol is Vala.Struct)
-      {
-        completion_item.kind = CompletionItemKind.Class;
-      }
-      if (symbol is Vala.Enum || symbol is Vala.ErrorDomain)
-      {
-        completion_item.kind = CompletionItemKind.Enum;
-      }
-      if (symbol is Vala.EnumValue || symbol is Vala.ErrorCode)
-      {
-        completion_item.kind = CompletionItemKind.EnumMember;
-      }
-      if (symbol is Vala.Interface)
-      {
-        completion_item.kind = CompletionItemKind.Interface;
-      }
-      if (symbol is Vala.Namespace)
-      {
-        completion_item.kind = CompletionItemKind.Module;
-      }
+      completion_item.kind = get_completion_item_kind(symbol);
       completion_items.add(completion_item);
     }
 
@@ -100,6 +85,51 @@ namespace Vls
     };
   }
 
+  CompletionItemKind get_completion_item_kind(Vala.Symbol symbol)
+  {
+    if (symbol is Vala.Field)
+    {
+      return CompletionItemKind.Field;
+    }
+    if (symbol is Vala.Property)
+    {
+      return CompletionItemKind.Property;
+    }
+    if (symbol is Vala.Variable || symbol is Vala.Parameter)
+    {
+      return CompletionItemKind.Variable;
+    }
+    if (symbol is Vala.Method)
+    {
+      return CompletionItemKind.Method;
+    }
+    if (symbol is Vala.Delegate)
+    {
+      return CompletionItemKind.Method;
+    }
+    if (symbol is Vala.Class || symbol is Vala.Struct)
+    {
+      return CompletionItemKind.Class;
+    }
+    if (symbol is Vala.Enum || symbol is Vala.ErrorDomain)
+    {
+      return CompletionItemKind.Enum;
+    }
+    if (symbol is Vala.EnumValue || symbol is Vala.ErrorCode)
+    {
+      return CompletionItemKind.EnumMember;
+    }
+    if (symbol is Vala.Interface)
+    {
+      return CompletionItemKind.Interface;
+    }
+    if (symbol is Vala.Namespace)
+    {
+      return CompletionItemKind.Module;
+    }
+    return CompletionItemKind.Text;
+  }
+
   /**
    * Returns the completion symbols at the specified position.
    * The general strategy is to:
@@ -108,14 +138,14 @@ namespace Vls
    *    'int __completion_symbol__ = [completion_expression];'
    * 3. Rebuild the syntax tree, find the '__completion_symbol__' node and inspect it to infer a list of proposals.
    */
-  Gee.Map<string, OrderedSymbol>? get_completion_symbols(Context context, SourceFile source_file, uint line, uint character, out string completion_member) throws Error
+  Gee.Map<string, OrderedSymbol>? get_completion_symbols(Context context, SourceFile source_file, uint line, uint character, out string completion_member, out int position_index) throws Error
   {
     completion_member = null;
     string original_source = source_file.content;
     try
     {
       // Extract the completion expression
-      int position_index = get_char_byte_index(source_file.content, line, character);
+      position_index = get_char_byte_index(source_file.content, line, character);
       string completion_expression = extract_completion_expression(source_file.content, position_index);
       if (completion_expression.has_suffix(".") || completion_expression == "")
       {
@@ -239,7 +269,7 @@ namespace Vls
    */
   Gee.Map<string, OrderedSymbol>? compute_completion_symbols(SourceFile source_file, out string completion_member)
   {
-    completion_member = null;  
+    completion_member = null;
     Vala.Symbol? completion_symbol = find_completion_symbol(source_file.file, completion_symbol_name);
     if (completion_symbol == null)
     {
@@ -359,7 +389,7 @@ namespace Vls
       }
     }
   }
-  
+
   /**
    * Enumerates every symbol reachable from the scope of 'node'.
    * Reachable symbols are filtered for visibility based on 'flags'.
@@ -717,7 +747,7 @@ namespace Vls
       character -= 1;
       index -= 1;
     }
-    
+
     if (!source[index].isalnum() && source[index] != '_')
     {
       if (loginfo) info("Cannot backtrack to method name");
@@ -725,8 +755,8 @@ namespace Vls
     }
 
     string completion_member;
-    Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, line, character, out completion_member);
-
+    int position_index;
+    Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, line, character, out completion_member, out position_index);
     if (symbols == null)
     {
       return null;
@@ -767,5 +797,16 @@ namespace Vls
     last_signature_help = signature_help;
 
     return signature_help;
+  }
+
+  /** Finds the first non-space and non-newline character from 'index' in 'source'. */
+  int skip_source_spaces(string source, int index)
+  {
+    int length = source.length;
+    while (index < length && source[index].isspace() && source[index] != '\n')
+    {
+      index += 1;
+    }
+    return index == length ? length - 1 : index;
   }
 }

@@ -36,33 +36,5 @@ namespace Vls
   int64 get_time_us()
   {
     return get_monotonic_time();
-  }  
-
-  //  delegate T ThrowsFunc<T>() throws Error;
-
-  //  T check_func_error<T>(ThrowsFunc func)
-  //  {
-  //    try
-  //    {
-  //      return func();
-  //    }
-  //    catch (Error err)
-  //    {
-  //      error("Unexpected error: %s", err.message);
-  //    }
-  //  }
-
-  //  delegate void ThrowsAction() throws Error;
-
-  //  void check_action_error(ThrowsAction action)
-  //  {
-  //    try
-  //    {
-  //      action();
-  //    }
-  //    catch (Error err)
-  //    {
-  //      error("Unexpected error: %s", err.message);
-  //    }
-  //  }
+  }
 }

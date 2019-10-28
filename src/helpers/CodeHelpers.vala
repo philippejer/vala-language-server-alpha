@@ -426,16 +426,6 @@ namespace Vls
     return index + 1 + text.substring(index + 1).index_of_nth_char((long)position_character);
   }
 
-  /** Finds the first non-space non-newline character from 'index' in 'source'. */
-  int skip_source_spaces(string source, int index)
-  {
-    while (source[index].isspace() && source[index] != '\n')
-    {
-      index += 1;
-    }
-    return index;
-  }
-
   /** Check C-strings for equality. */
   bool equal_strings(char* s1, char* s2, int length)
   {

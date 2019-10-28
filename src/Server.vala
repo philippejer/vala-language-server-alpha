@@ -18,7 +18,15 @@ namespace Vls
     }
   }
 
+  enum MethodCompletionMode
+  {
+    OFF = 0,
+    SPACE,
+    NOSPACE;
+  }
+
   DebugLevel debug_level = DebugLevel.OFF;
+  MethodCompletionMode method_completion_mode = MethodCompletionMode.OFF;
 
   bool logdebug = false;
   bool loginfo = false;
