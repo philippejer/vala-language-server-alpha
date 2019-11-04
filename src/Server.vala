@@ -898,7 +898,11 @@ namespace Vls
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
+#if LIBVALA_EXP
       if (reporter == null || reporter.get_errors()  > 0 || reporter.get_suppr_errors() > 0)
+#else
+      if (reporter == null || reporter.get_errors()  > 0)
+#endif
       {        
         client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, "Cannot rename because of compilation errors", null);
         return;
