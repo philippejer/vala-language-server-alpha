@@ -24,10 +24,10 @@ Note: the code uses many hacks and tricks (especially completion related stuff),
 
 Currently it has only been "tested" with a specific setup:
 
-- Visual Studio Code as the client IDE (other IDEs might work but I have not tested it)
-- The project should be built with Meson 0.50+, as the language server uses Meson introspection to discover the source files and compiler options (this should be fairly common for current Vala projects)
-- If Meson is not available or does not work, it is possible to use a `vala-language-server.json` config file (see above)
-- The language server depends on Vala 0.46+ to parse and analyze the source files (other versions might work but this is the one I use)
+* Visual Studio Code as the client IDE (other IDEs might work but I have not tested it)
+* The project should be built with Meson 0.50+, as the language server uses Meson introspection to discover the source files and compiler options (this should be fairly common for current Vala projects)
+* If Meson is not available or does not work, it is possible to use a `vala-language-server.json` config file (see above)
+* The language server depends on Vala 0.46+ to parse and analyze the source files (other versions might work but this is the one I use)
 
 I have written a quick step-by-step guide on [how to compile](#how-to-compile) the language server starting from a vanilla Ubuntu distribution (18.04) and the same with MinGW-64 under Windows.
 
@@ -44,6 +44,16 @@ The following features work reasonably well (for my requirements anyway):
 * Find references / symbol rename (rename support is limited, use with care)
 * Code completion (crude and hack-ish but still fairly fast and usable in common situations)
 
+## Limitations and known bugs
+
+* If the Vala parser cannot parse the code (syntax error), code navigation will not work. For semantic errors, it does work, only the syntax needs to be correct. Note that I have made a compiler fork with a few experimental switches, in particular to allow the parser to ignore trivial syntax errors like missing semicolons (see below).
+
+* The completion is a bit of a hack: to get around the fact that the parser most likely cannot parse the currently edited line of code, the expression just before the cursor is extracted "manually" (instead of relying on the parser, which is the first part of the hack), then the edited line is replaced by a fake "member access" expression (second part of the hack) and finally, the parser is run again to analyze that expression and infer a list of proposals. This approach may fail for various reasons, and then there will be no completion proposals. In pratice however, this approach does seem to work well in most practical situations, and has the advantage to be easier to implement (because the expression to inspect is guaranteed to be a member access expression, there is no need to handle the myriad of contexts where completion can be triggered).
+
+* Symbol rename can fail to find every usage, use with care (it does work well in many common cases). Same thing with "find usages" since it shares the same logic.
+
+* The dynamic diagnostics (errors and warnings) will only report syntax and semantic errors, not errors triggered during code generation, because code generation is very expensive. Fortunately, most errors are detected before code generation. An example of unseen error is passing the wrong type of delegate (with/without closure) to a method, which is currently only detected during code generation.
+
 ## Experimental compiler branch
 
 Note that [this branch](https://gitlab.gnome.org/philippejer/vala/tree/0.46.3-exp) contains a few experimental compiler switches (disabled by default), one in particular is a small modification of the parser to enable code navigation in the presence of trivial syntax errors like a missing semicolon (by default the syntax tree is not built in the presence of syntax errors).
@@ -59,9 +69,9 @@ Quick steps on how to compile and setup everything (tested with Ubuntu 18.04).
 * Install required build packages
   * `sudo apt-get install build-essential cmake autoconf autoconf-archive automake libtool flex bison libgraphviz-dev libgee-0.8-dev libjsonrpc-glib-1.0-dev`
 * Download the pre-compiled Vala sources
-  * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.0.tar.xz' && tar xf vala-0.46.0.tar.xz`
+  * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.3.tar.xz' && tar xf vala-0.46.3.tar.xz`
 * Compile Valac
-  * `cd vala-0.46.0 && ./configure && make`
+  * `cd vala-0.46.3 && ./configure && make`
 * Install Valac (under `/usr/local`)
   * `sudo make install`
 * Check the installation
@@ -69,7 +79,9 @@ Quick steps on how to compile and setup everything (tested with Ubuntu 18.04).
 * For some reason I have had to rebuild the dynamic library cache once
   * `sudo rm -f /etc/ld.so.cache ; sudo ldconfig`
 
-### Install Meson (version 0.50+ is required by the language server for build file introspection)
+### Install Meson
+
+Vversion 0.50+ is required by the language server for build file introspection (but it is also possible to use a plain `vala-language-server.json` file as explained above).
 
 * Install Python
   * `sudo apt-get install python3 python3-pip python3-setuptools python3-wheel ninja-build`
@@ -105,15 +117,17 @@ The general steps are quite similar with MinGW-64 (this is actually my main setu
 Note: you can skip this step by installing the recently updated vala compiler (0.46.3) from the package repository (`pacman -S mingw-w64-x86_64-vala`)
 
 * Download the pre-compiled Vala sources
-  * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.0.tar.xz' && tar xf vala-0.46.0.tar.xz`
+  * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.3.tar.xz' && tar xf vala-0.46.3.tar.xz`
 * Compile Valac
-  * `cd vala-0.46.0 && ./configure && make`
+  * `cd vala-0.46.3 && ./configure && make`
 * Install Valac
   * `make install`
 * Workaround for some bug in libtool (presumably) which puts one DLL in the wrong directory
   * `mv /mingw64/lib/bin/libvalaccodegen.dll /mingw64/bin/ && rmdir /mingw64/lib/bin`
 
-### Install Meson (version 0.50+ is required by the language server for build file introspection)
+### Install Meson
+
+Vversion 0.50+ is required by the language server for build file introspection (but it is also possible to use a plain `vala-language-server.json` file as explained above).
 
 * Install Python
   * `pacman -S mingw-w64-x86_64-python3-pip`
