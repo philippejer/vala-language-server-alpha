@@ -70,7 +70,9 @@ executable('vala-language-server',
 	sources: [sources, 'src/Main.vala'],
 	install: true)
 
-executable('vala-language-server-tests',
-	dependencies: dependencies,
-	sources: [sources, 'tests/TestMain.vala'],
-	install: true)
+if get_option('build_tests')
+	test('CompletionTests', executable('vala-language-server-tests',
+			dependencies: dependencies,
+			sources: [sources, 'tests/CompletionTests.vala'],
+			install: true))
+endif
