@@ -14,6 +14,8 @@ Also please note that this tool currently assumes that the client IDE is the lat
 
 2019-10-20: A fallback is now available by adding a `vala-language-server.json` configuration file under the project root directory. This file will be detected and used to configure the list of sources files and/or directories and the compiler parameters (it is possible to simply copy the Vala compiler command line from e.g. `compile_commands.json`). An example configuration can be found [here](https://github.com/philippejer/vala-language-server-alpha/blob/master/vala-language-server-test.json).
 
+2019-11-12: It seems there are issues under Windows when the console is in "legacy" mode (see [this comment](https://github.com/philippejer/vala-language-server-alpha/issues/3#issuecomment-552890895)). If you get an error like "Meson did not return an array of targets...", this is probably it, try to disable the legacy mode in the console properties to see if it solves the issue.
+
 ## Description
 
 This is a basic language server for the [Vala](https://wiki.gnome.org/Projects/Vala) language, which is relatively limited in scope and mostly tailored to my specific setup (see requirements). I do not intend to polish it much further, however it feels usable enough that I have decided to publish the source code (the current Vala IDEs seem very limited and/or obsolete).
@@ -53,6 +55,8 @@ The following features work reasonably well (for my requirements anyway):
 * Symbol rename can fail to find every usage, use with care (it does work well in many common cases). Same thing with "find usages" since it shares the same logic.
 
 * The dynamic diagnostics (errors and warnings) will only report syntax and semantic errors, not errors triggered during code generation, because code generation is very expensive. Fortunately, most errors are detected before code generation. An example of unseen error is passing the wrong type of delegate (with/without closure) to a method, which is currently only detected during code generation.
+
+* Genie is not currently a target, however many things (code navigation) should already work, some of the more hack-ish things which rely on text-based heuristics (esp. completion) will probably not work (but could probably be made to work fairly easily).
 
 ## Experimental compiler branch
 
