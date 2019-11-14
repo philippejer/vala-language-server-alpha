@@ -356,95 +356,138 @@ namespace Vls
 
     private void analyze_meson_build(string root_path, string build_dir) throws Error
     {
-      string[] spawn_args = { "meson", "introspect", build_dir, "--indent", "--targets" };
-      string proc_stdout;
-      string proc_stderr;
-      int proc_status;
-
-      string meson_command = string.joinv(" ", spawn_args);
-      if (loginfo) info(@"Meson introspect command ($(meson_command))");
-      Process.spawn_sync(root_path, spawn_args, null, SpawnFlags.SEARCH_PATH, null, out proc_stdout, out proc_stderr, out proc_status);
-
-      if (proc_status != 0)
+    #if WINDOWS
+      bool must_free_console = false;
+      if (Windows.GetConsoleWindow() == null)
       {
-        throw new VlsError.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout))).");
+        // It seems to happen only in some configurations, in particular if the console is in "legacy" mode...
+        // GLib then thinks this is a GUI app and uses the wrong helper, must (re-)allocate a console to avoid that
+        if (loginfo) info("There is no console, allocating console temporarily to spawn Meson");
+        bool success = Windows.FreeConsole();
+        if (!success)
+        {
+          int err = Windows.GetLastError();
+          if (logwarn) warning(@"Could not free console: $(err)");
+        }
+        success = Windows.AllocConsole();
+        if (!success)
+        {
+          int err = Windows.GetLastError();
+          if (logwarn) warning(@"Could not allocate console: $(err)");
+        }
+        else
+        {
+          must_free_console = true;
+        }
       }
-
-      // Clear context since it will be repopulated from the targets
-      context.clear();
-
-      string targets_json = proc_stdout.replace("\r", "");
-      if (logdebug) debug(@"Meson intropect command successful ($(targets_json))");
+    #endif
       
-      Json.Node targets_node;
       try
       {
-        targets_node = parse_json(targets_json);
-      }
-      catch (Error err)
-      {
-        throw new VlsError.FAILED(@"Could not parse Meson result as JSON: $(err.message), please activate the debug logs and check the result from Meson.");
-      }
-      if (targets_node.get_node_type() != Json.NodeType.ARRAY)
-      {
-        throw new VlsError.FAILED(@"Meson did not return an array of targets, please activate the debug logs and check the result from Meson.");
-      }
+        string[] spawn_args = { "meson", "introspect", build_dir, "--indent", "--targets" };
+        string proc_stdout;
+        string proc_stderr;
+        int proc_status;
 
-      bool has_executable_target = false;
-      Json.Array targets_array = targets_node.get_array();
-      for (int i = 0; i < targets_array.get_length(); i++)
-      {
-        Json.Object target_object = targets_array.get_object_element(i);
-        string target_name = target_object.get_string_member("name");
-        string target_type = target_object.get_string_member("type");
-        if (loginfo) info(@"Meson target ($(target_name)) ($(target_type))");
+        string meson_command = string.joinv(" ", spawn_args);
+        if (loginfo) info(@"Meson introspect command ($(meson_command))");
+        Process.spawn_sync(root_path, spawn_args, null, SpawnFlags.SEARCH_PATH, null, out proc_stdout, out proc_stderr, out proc_status);
 
-        if (target_type != "executable" && !target_type.has_suffix("library"))
+        if (proc_status != 0)
         {
-          if (loginfo) info(@"Target is not an executable target and will be ignored: '$(target_name)' ($(target_type))");
-          continue;
+          throw new VlsError.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout))).");
         }
 
-        if (target_type == "executable")
+        // Clear context since it will be repopulated from the targets
+        context.clear();
+
+        string targets_json = proc_stdout.replace("\r", "");
+        if (logdebug) debug(@"Meson intropect command successful ($(targets_json))");
+        
+        Json.Node targets_node;
+        try
         {
-          if (has_executable_target)
-          {
-            if (logwarn) warning(@"Multiple executable targets found in Meson build file, additional executable target will be ignored: '$(target_name)' ($(target_type)) ignored");
-            continue;
-          }
-          has_executable_target = true;
+          targets_node = parse_json(targets_json);
+        }
+        catch (Error err)
+        {
+          throw new VlsError.FAILED(@"Could not parse Meson result as JSON: $(err.message), please activate the debug logs and check the result from Meson.");
+        }
+        if (targets_node.get_node_type() != Json.NodeType.ARRAY)
+        {
+          throw new VlsError.FAILED(@"Meson did not return an array of targets, please activate the debug logs and check the result from Meson.");
         }
 
-        Json.Array target_sources_array = target_object.get_array_member("target_sources");
-        for (int j = 0; j < target_sources_array.get_length(); j++)
+        bool has_executable_target = false;
+        Json.Array targets_array = targets_node.get_array();
+        for (int i = 0; i < targets_array.get_length(); i++)
         {
-          Json.Object target_source_object = target_sources_array.get_object_element(j);
+          Json.Object target_object = targets_array.get_object_element(i);
+          string target_name = target_object.get_string_member("name");
+          string target_type = target_object.get_string_member("type");
+          if (loginfo) info(@"Meson target ($(target_name)) ($(target_type))");
 
-          string language = target_source_object.get_string_member("language");
-          if (language != "vala")
+          if (target_type != "executable" && !target_type.has_suffix("library"))
           {
+            if (loginfo) info(@"Target is not an executable target and will be ignored: '$(target_name)' ($(target_type))");
             continue;
           }
 
-          if (target_source_object.has_member("parameters"))
+          if (target_type == "executable")
           {
-            Json.Array parameters_array = target_source_object.get_array_member("parameters");
-            string[] parameters = new string[parameters_array.get_length()];
-            parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());
-            string compiler_parameters = string.joinv(" ", parameters);
-            parse_compiler_parameters(compiler_parameters);
-          }
-
-          if (target_source_object.has_member("sources"))
-          {
-            Json.Array sources_array = target_source_object.get_array_member("sources");
-            for (int k = 0; k < sources_array.get_length(); k++)
+            if (has_executable_target)
             {
-              string filename = sources_array.get_string_element(k);
-              add_source_path(root_path, filename);
+              if (logwarn) warning(@"Multiple executable targets found in Meson build file, additional executable target will be ignored: '$(target_name)' ($(target_type)) ignored");
+              continue;
+            }
+            has_executable_target = true;
+          }
+
+          Json.Array target_sources_array = target_object.get_array_member("target_sources");
+          for (int j = 0; j < target_sources_array.get_length(); j++)
+          {
+            Json.Object target_source_object = target_sources_array.get_object_element(j);
+
+            string language = target_source_object.get_string_member("language");
+            if (language != "vala")
+            {
+              continue;
+            }
+
+            if (target_source_object.has_member("parameters"))
+            {
+              Json.Array parameters_array = target_source_object.get_array_member("parameters");
+              string[] parameters = new string[parameters_array.get_length()];
+              parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());
+              string compiler_parameters = string.joinv(" ", parameters);
+              parse_compiler_parameters(compiler_parameters);
+            }
+
+            if (target_source_object.has_member("sources"))
+            {
+              Json.Array sources_array = target_source_object.get_array_member("sources");
+              for (int k = 0; k < sources_array.get_length(); k++)
+              {
+                string filename = sources_array.get_string_element(k);
+                add_source_path(root_path, filename);
+              }
             }
           }
         }
+      }
+      finally
+      {
+    #if WINDOWS
+        if (must_free_console)
+        {
+          bool success = Windows.FreeConsole();
+          if (!success)
+          {
+            int err = Windows.GetLastError();
+            if (logwarn) warning(@"Could not free console: $(err)");
+          }
+        }
+    #endif
       }
     }
 
