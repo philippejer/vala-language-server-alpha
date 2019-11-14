@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.4
+- Fix issue with Meson command failing under MinGW because the wrong GLib helper process is used.
+
 ## 1.0.3
 - Fix bug where some static members are not in the completions (e.g. float.max()).
 - Disable rename when there are compiler errors.

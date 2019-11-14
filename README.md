@@ -14,7 +14,7 @@ Also please note that this tool currently assumes that the client IDE is the lat
 
 2019-10-20: A fallback is now available by adding a `vala-language-server.json` configuration file under the project root directory. This file will be detected and used to configure the list of sources files and/or directories and the compiler parameters (it is possible to simply copy the Vala compiler command line from e.g. `compile_commands.json`). An example configuration can be found [here](https://github.com/philippejer/vala-language-server-alpha/blob/master/vala-language-server-test.json).
 
-2019-11-12: It seems there are issues under Windows when the console is in "legacy" mode (see [this comment](https://github.com/philippejer/vala-language-server-alpha/issues/3#issuecomment-552890895)). If you get an error like "Meson did not return an array of targets...", this is probably it, try to disable the legacy mode in the console properties to see if it solves the issue.
+2019-11-14: Committed workaround for [issue](https://github.com/philippejer/vala-language-server-alpha/issues/3#issuecomment-553895576) when starting Meson under Windows ("Meson did not return an array of targets...").
 
 ## Description
 
