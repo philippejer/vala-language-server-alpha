@@ -180,41 +180,46 @@ namespace Vls
       string root_uri = initialize_params.rootUri;
 
       string root_path = Filename.from_uri(root_uri);
-      if (loginfo) info(@"root_uri ($(root_uri)), root_path ($(root_path))");
+      if (loginfo) info(@"Initialize request received: root_uri ($(root_uri)), root_path ($(root_path))");
 
-      string? config_file = find_file_in_dir(root_path, "vala-language-server.json");
-      if (config_file != null)
+      // Check for the build file with the list of sources and compilation flags 
+      string? build_file = find_file_in_dir(root_path, "vala-language-server.json");
+      if (build_file != null)
       {
-        analyze_config_file(root_path, config_file);
+        if (loginfo) info(@"Found build file ($(build_file))");
+        analyze_build_file(root_path, build_file);
 
         // Analyze again when the file changes
-        monitor_file(config_file, false, () =>
+        monitor_file(build_file, false, () =>
         {
-          if (loginfo) info("Config file has changed, reanalyzing...");
-          analyze_config_file(root_path, config_file);
+          if (loginfo) info(@"Build file has changed ($(build_file)), reanalyzing...");
+          analyze_build_file(root_path, build_file);
           request_publishDiagnostics(client);
         });
       }
       else
       {
-        string? meson_file = find_file_in_dir(root_path, "meson.build");
-        if (meson_file == null)
+        if (loginfo) info(@"No build file 'vala-language-server.json' found, searching for Meson info");
+        
+        string? meson_info_dir = find_file_in_dir(root_path, "meson-info", FileTest.IS_DIR);
+        if (meson_info_dir == null)
         {
-          throw new VlsError.FAILED(@"Cannot find Meson build file 'meson.build' under root path ($(root_path)).");
+          throw new VlsError.FAILED(@"Cannot find Meson info directory 'meson-info' under root path ($(root_path)).");
         }
-        string? ninja_file = find_file_in_dir(root_path, "build.ninja");
-        if (ninja_file == null)
+        string? meson_file = find_file_in_dir(meson_info_dir, "intro-targets.json", FileTest.IS_REGULAR);
+        if (meson_info_dir == null)
         {
-          throw new VlsError.FAILED(@"Cannot find Ninja build file 'build.ninja' under root path ($(root_path)).");
+          throw new VlsError.FAILED(@"Cannot find Meson targets file 'intro-targets.json' under info directory ($(meson_info_dir)).");
         }
-        string build_dir = Path.get_dirname(ninja_file);
-        analyze_meson_build(root_path, build_dir);
+
+        if (loginfo) info(@"Found Meson targets file ($(meson_file))");
+        analyze_meson_build(root_path, meson_file);
 
         // Analyze again when the file changes
-        monitor_file(ninja_file, false, () =>
+        monitor_file(meson_file, false, () =>
         {
-          if (loginfo) info("Meson build file has changed, reanalyzing...");
-          analyze_meson_build(root_path, build_dir);
+          if (loginfo) info(@"Meson build file has changed ($(meson_file)), reanalyzing...");
+          analyze_meson_build(root_path, meson_file);
           request_publishDiagnostics(client);
         });
       }
@@ -290,7 +295,7 @@ namespace Vls
       return Stat(file).st_mtime;
     }
 
-    private string? find_file_in_dir(string dirname, string target) throws Error
+    private string? find_file_in_dir(string dirname, string target, FileTest? test = null) throws Error
     {
       Dir dir = Dir.open(dirname, 0);
       for (string name = dir.read_name(); name != null; name = dir.read_name())
@@ -298,12 +303,16 @@ namespace Vls
         string filepath = Path.build_filename(dirname, name);
         if (name == target)
         {
+          if (test != null && !FileUtils.test(filepath, test))
+          {
+            throw new VlsError.FAILED(@"Found file ($(filepath)) but it does not satisfy $(test)");
+          }
           return filepath;
         }
 
         if (FileUtils.test(filepath, FileTest.IS_DIR))
         {
-          filepath = find_file_in_dir(filepath, target);
+          filepath = find_file_in_dir(filepath, target, test);
           if (filepath != null)
           {
             return filepath;
@@ -314,7 +323,7 @@ namespace Vls
       return null;
     }
 
-    private void analyze_config_file(string rootdir, string config_file) throws Error
+    private void analyze_build_file(string root_path, string config_file) throws Error
     {
       Json.Node config_node = null;
       try
@@ -342,7 +351,7 @@ namespace Vls
       for (int k = 0; k < sources_array.get_length(); k++)
       {
         string filename = sources_array.get_string_element(k);
-        add_source_path(rootdir, filename);
+        add_source_path(root_path, filename);
       }
 
       if (!config_object.has_member("parameters"))
@@ -354,146 +363,90 @@ namespace Vls
       parse_compiler_parameters(parameters.replace("\"", ""));
     }
 
-    private void analyze_meson_build(string root_path, string build_dir) throws Error
+    private void analyze_meson_build(string root_path, string meson_file) throws Error
     {
-    #if WINDOWS
-      bool must_free_console = false;
-      if (Windows.GetConsoleWindow() == null)
-      {
-        // It seems to happen only in some configurations, in particular if the console is in "legacy" mode...
-        // GLib then thinks this is a GUI app and uses the wrong helper, must (re-)allocate a console to avoid that
-        if (loginfo) info("There is no console, allocating console temporarily to spawn Meson");
-        bool success = Windows.FreeConsole();
-        if (!success)
-        {
-          int err = Windows.GetLastError();
-          if (logwarn) warning(@"Could not free console: $(err)");
-        }
-        success = Windows.AllocConsole();
-        if (!success)
-        {
-          int err = Windows.GetLastError();
-          if (logwarn) warning(@"Could not allocate console: $(err)");
-        }
-        else
-        {
-          must_free_console = true;
-        }
-      }
-    #endif
-      
+      string targets_json;
+      FileUtils.get_contents(meson_file, out targets_json);
+      if (logdebug) debug(@"Meson introspection file contents ($(targets_json))");
+
+      // Clear context since it will be repopulated from the targets
+      context.clear();
+
+      Json.Node targets_node;
       try
       {
-        string[] spawn_args = { "meson", "introspect", build_dir, "--indent", "--targets" };
-        string proc_stdout;
-        string proc_stderr;
-        int proc_status;
+        targets_node = parse_json(targets_json);
+      }
+      catch (Error err)
+      {
+        throw new VlsError.FAILED(@"Could not parse Meson result as JSON: $(err.message), please activate the debug logs and check the result from Meson.");
+      }
+      if (targets_node.get_node_type() != Json.NodeType.ARRAY)
+      {
+        throw new VlsError.FAILED(@"Meson did not return an array of targets, please activate the debug logs and check the result from Meson.");
+      }
 
-        string meson_command = string.joinv(" ", spawn_args);
-        if (loginfo) info(@"Meson introspect command ($(meson_command))");
-        Process.spawn_sync(root_path, spawn_args, null, SpawnFlags.SEARCH_PATH, null, out proc_stdout, out proc_stderr, out proc_status);
+      bool has_executable_target = false;
+      Json.Array targets_array = targets_node.get_array();
+      for (int i = 0; i < targets_array.get_length(); i++)
+      {
+        Json.Object target_object = targets_array.get_object_element(i);
+        string target_name = target_object.get_string_member("name");
+        string target_type = target_object.get_string_member("type");
+        if (loginfo) info(@"Meson target ($(target_name)) ($(target_type))");
 
-        if (proc_status != 0)
+        if (target_type != "executable" && !target_type.has_suffix("library"))
         {
-          throw new VlsError.FAILED(@"Meson has returned non-zero status ($(proc_status)) ($(proc_stdout))).");
+          if (loginfo) info(@"Target is not an executable target and will be ignored: '$(target_name)' ($(target_type))");
+          continue;
         }
 
-        // Clear context since it will be repopulated from the targets
-        context.clear();
-
-        string targets_json = proc_stdout.replace("\r", "");
-        if (logdebug) debug(@"Meson intropect command successful ($(targets_json))");
-        
-        Json.Node targets_node;
-        try
+        if (target_type == "executable")
         {
-          targets_node = parse_json(targets_json);
-        }
-        catch (Error err)
-        {
-          throw new VlsError.FAILED(@"Could not parse Meson result as JSON: $(err.message), please activate the debug logs and check the result from Meson.");
-        }
-        if (targets_node.get_node_type() != Json.NodeType.ARRAY)
-        {
-          throw new VlsError.FAILED(@"Meson did not return an array of targets, please activate the debug logs and check the result from Meson.");
-        }
-
-        bool has_executable_target = false;
-        Json.Array targets_array = targets_node.get_array();
-        for (int i = 0; i < targets_array.get_length(); i++)
-        {
-          Json.Object target_object = targets_array.get_object_element(i);
-          string target_name = target_object.get_string_member("name");
-          string target_type = target_object.get_string_member("type");
-          if (loginfo) info(@"Meson target ($(target_name)) ($(target_type))");
-
-          if (target_type != "executable" && !target_type.has_suffix("library"))
+          if (has_executable_target)
           {
-            if (loginfo) info(@"Target is not an executable target and will be ignored: '$(target_name)' ($(target_type))");
+            if (logwarn) warning(@"Multiple executable targets found in Meson build file, additional executable target will be ignored: '$(target_name)' ($(target_type)) ignored");
+            continue;
+          }
+          has_executable_target = true;
+        }
+
+        Json.Array target_sources_array = target_object.get_array_member("target_sources");
+        for (int j = 0; j < target_sources_array.get_length(); j++)
+        {
+          Json.Object target_source_object = target_sources_array.get_object_element(j);
+
+          string language = target_source_object.get_string_member("language");
+          if (language != "vala")
+          {
             continue;
           }
 
-          if (target_type == "executable")
+          if (target_source_object.has_member("parameters"))
           {
-            if (has_executable_target)
-            {
-              if (logwarn) warning(@"Multiple executable targets found in Meson build file, additional executable target will be ignored: '$(target_name)' ($(target_type)) ignored");
-              continue;
-            }
-            has_executable_target = true;
+            Json.Array parameters_array = target_source_object.get_array_member("parameters");
+            string[] parameters = new string[parameters_array.get_length()];
+            parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());
+            string compiler_parameters = string.joinv(" ", parameters);
+            parse_compiler_parameters(compiler_parameters);
           }
 
-          Json.Array target_sources_array = target_object.get_array_member("target_sources");
-          for (int j = 0; j < target_sources_array.get_length(); j++)
+          if (target_source_object.has_member("sources"))
           {
-            Json.Object target_source_object = target_sources_array.get_object_element(j);
-
-            string language = target_source_object.get_string_member("language");
-            if (language != "vala")
+            Json.Array sources_array = target_source_object.get_array_member("sources");
+            for (int k = 0; k < sources_array.get_length(); k++)
             {
-              continue;
-            }
-
-            if (target_source_object.has_member("parameters"))
-            {
-              Json.Array parameters_array = target_source_object.get_array_member("parameters");
-              string[] parameters = new string[parameters_array.get_length()];
-              parameters_array.foreach_element((array, index, parameter_node) => parameters[index] = parameter_node.get_string());
-              string compiler_parameters = string.joinv(" ", parameters);
-              parse_compiler_parameters(compiler_parameters);
-            }
-
-            if (target_source_object.has_member("sources"))
-            {
-              Json.Array sources_array = target_source_object.get_array_member("sources");
-              for (int k = 0; k < sources_array.get_length(); k++)
-              {
-                string filename = sources_array.get_string_element(k);
-                add_source_path(root_path, filename);
-              }
+              string filename = sources_array.get_string_element(k);
+              add_source_path(root_path, filename);
             }
           }
         }
-      }
-      finally
-      {
-    #if WINDOWS
-        if (must_free_console)
-        {
-          bool success = Windows.FreeConsole();
-          if (!success)
-          {
-            int err = Windows.GetLastError();
-            if (logwarn) warning(@"Could not free console: $(err)");
-          }
-        }
-    #endif
       }
     }
 
-    private void add_source_path(string rootdir, string filepath) throws Error
+    private void add_source_path(string root_path, string filepath) throws Error
     {
-      filepath = Path.is_absolute(filepath) ? filepath : Path.build_filename(rootdir, filepath);
+      filepath = Path.is_absolute(filepath) ? filepath : Path.build_filename(root_path, filepath);
 
       if (FileUtils.test(filepath, FileTest.IS_DIR))
       {
@@ -502,7 +455,7 @@ namespace Vls
         for (string name = dir.read_name(); name != null; name = dir.read_name())
         {
           string filename = Path.build_filename(filepath, name);
-          add_source_path(rootdir, filename);
+          add_source_path(root_path, filename);
         }
       }
       else if (is_source_file(filepath))

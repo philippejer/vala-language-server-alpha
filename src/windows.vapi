@@ -6,10 +6,4 @@ namespace Windows
   int _dup(int fd);
   int _dup2(int fd1, int fd2);
   int _close(int fd);
-
-  void* GetConsoleWindow();
-  bool AllocConsole();
-  bool FreeConsole();
-
-  int GetLastError();
 }
