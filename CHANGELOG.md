@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0
+- Simplify Meson-base configuration by simply directly reading the 'intro-targets.json' instead of spawning Meson, which did not work well under MinGW.
+- Added support for code lints, with two initial lints to enforce explicit "this" access and/or explicit static member access.
+- Added support for dynamic settings between client and server (ServerConfig), allowing to change the log level on the fly without reloading the window (requires an update of the client VSCode extension).
+- Added CodeLens support for references to methods and properties (similar to how C# is handled, command is specific to VSCode however).
+- Added some checks to avoid renaming a symbol if the target name is already defined in the scope of one of the references (maybe too conservative since it would compile in some cases, however overloading a name from the parent scope is generally considered bad practice these days anyway).
+- Fix potential performance issue in FindNode-derived code visitors, where the same nodes could be visited many times, by checking for already visited node in the base class (also to avoid logic duplication).
+- Fix bug where constructors were not found by code navigation (navigated to the parent class instead).
+- Fix bug where member initializers were not found by code visitors, making them invisible to code navigation, references and renaming (bug will be reported in Vala but worked around for now).
+- Refactored some global functions into static helper classes, and added explicit public/private modifiers, in an attempt to avoid duplication in the generated C code (when combined with the --use-header switch) and hopefully make the "unity" build mode of Meson work someday (this will require some modifications of the Vala compiler, since it seems it replicates common string/array functions in each generated file).
+- Refactored logs to make them more readable (hopefully).
+
 ## 1.0.4
 - Fix issue with Meson command failing under MinGW because the wrong GLib helper process is used.
 

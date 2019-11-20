@@ -6,11 +6,15 @@ sources = files([
 	'src/Context.vala',
 	'src/visitors/FindNode.vala',
 	'src/visitors/FindNodeInFile.vala',
-	'src/visitors/FindNodeByPosition.vala',
-	'src/visitors/FindSymbolByPosition.vala',
+	'src/visitors/FindNodeInFileNop.vala',
+	'src/visitors/FindNodeAtPosition.vala',
+	'src/visitors/FindSymbolReferenceAtPosition.vala',
 	'src/visitors/FindSymbolByName.vala',
 	'src/visitors/FindSymbolReferences.vala',
 	'src/visitors/FindSymbolsInFile.vala',
+	'src/visitors/FindCodeLensSymbolsInFile.vala',
+	'src/visitors/FindCodeLensSymbolInFile.vala',
+	'src/visitors/CheckLintInFile.vala',
 	'src/helpers/CodeHelpers.vala',
 	'src/helpers/CompletionHelpers.vala',
 	'src/helpers/DocumentSymbolHelpers.vala',
@@ -18,7 +22,7 @@ sources = files([
 	'src/helpers/TestHelpers.vala',
 	'src/protocol/Protocol.vala',
 	'src/protocol/JsonSerialization.vala',
-	'src/protocol/JsonSerializable.vapi'
+	'src/protocol/JsonSerializable.vapi',
 ])
 
 valac = meson.get_compiler('vala')
@@ -49,6 +53,12 @@ add_project_arguments([
 		# '--disable-warnings',
 	], language: 'vala')
 
+# add_project_arguments([
+# 		'--header=vala-language-server.h',
+# 		'--internal-header=vala-language-server-internal.h',
+# 		'--use-header'
+# 	], language: 'vala')
+
 buildtype = get_option('buildtype')
 if buildtype.startswith('debug')
     add_project_arguments(['--define', 'DEBUG'], language: 'vala')
@@ -62,8 +72,14 @@ endif
 add_project_arguments(['--pkg=posix'], language: 'vala')
 
 add_project_arguments([
-		'-D', '_POSIX_C_SOURCE',
+		'-D', '_POSIX_C_SOURCE', '-w'
 	], language: 'c')
+
+# if not get_option('buildtype').startswith('debug')
+#   add_project_arguments([
+#     '-flto'
+#   ], language: 'c')
+# endif
 
 executable('vala-language-server',
 	dependencies: dependencies,
@@ -71,8 +87,8 @@ executable('vala-language-server',
 	install: true)
 
 if get_option('build_tests')
-	test('CompletionTests', executable('vala-language-server-tests',
+	test('tests', executable('vala-language-server-tests',
 			dependencies: dependencies,
-			sources: [sources, 'tests/CompletionTests.vala'],
+			sources: [sources, 'tests/TestsMain.vala'],
 			install: true))
 endif

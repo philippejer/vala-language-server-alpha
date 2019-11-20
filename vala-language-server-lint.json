@@ -1,0 +1,5 @@
+{
+  "$schema": "file:///D:/devel/workspace/vala-language-server-alpha/vala-language-server-lint-schema.json",
+  "no-implicit-this-access": "ignore",
+  "no-unqualified-static-access": "ignore"
+}

@@ -1,8 +1,8 @@
 namespace Vls
 {
-  delegate void Action() throws Error;
+  public delegate void Action() throws Error;
 
-  void debug_action_time(string label, Action action) throws Error
+  public void show_elapsed_time(string label, Action action) throws Error
   {
     var timer = new Timer();
     timer.start();
@@ -21,20 +21,30 @@ namespace Vls
   }
 
 #if WINDOWS
-  string sanitize_file_uri(string uri)
+  public string sanitize_file_uri(string uri)
   {
     // VS Code encodes the drive colon (known issue on Windows)
     return Uri.unescape_string(uri);
   }
 #else
-  string sanitize_file_uri(string uri)
+  public string sanitize_file_uri(string uri)
   {
     return uri;
   }
 #endif
 
-  int64 get_time_us()
+  public int64 get_time_us()
   {
     return get_monotonic_time();
+  }
+
+  public unowned V? first_of_map<K, V>(Gee.Map<K, V> map)
+  {
+    var iterator = map.iterator();
+    if (!iterator.next())
+    {
+      return null;
+    }
+    return iterator.get().value;
   }
 }

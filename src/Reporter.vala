@@ -1,6 +1,6 @@
 namespace Vls
 {
-  class SourceError
+  public class SourceError
   {
     public Vala.SourceReference source;
     public string message;
@@ -12,7 +12,7 @@ namespace Vls
     }
   }
 
-  class Reporter : Vala.Report
+  public class Reporter : Vala.Report
   {
     public Gee.HashMap<string, Gee.ArrayList<SourceError>> errors_by_file = new Gee.HashMap<string, Gee.ArrayList<SourceError>>();
     public Gee.HashMap<string, Gee.ArrayList<SourceError>> warnings_by_file = new Gee.HashMap<string, Gee.ArrayList<SourceError>>();
@@ -26,7 +26,7 @@ namespace Vls
       }
       else if (source == null)
       {
-        if (logwarn) GLib.warning(@"Non-source note ($(message))");
+        if (logwarn) GLib.warning(@"Non-source note: '$(message)'");
       }
       else
       {
@@ -43,7 +43,7 @@ namespace Vls
       ++warnings;
       if (source == null)
       {
-        if (logwarn) GLib.warning(@"Non-source deprecation ($(message))");
+        if (logwarn) GLib.warning(@"Non-source deprecation: '$(message)'");
       }
       else
       {
@@ -60,7 +60,7 @@ namespace Vls
       ++warnings;
       if (source == null)
       {
-        if (logwarn) GLib.warning(@"Non-source warning ($(message))");
+        if (logwarn) GLib.warning(@"Non-source warning: '$(message)'");
       }
       else
       {
@@ -73,7 +73,7 @@ namespace Vls
       ++errors;
       if (source == null)
       {
-        GLib.error(@"Non-source error ($(message))");
+        if (logwarn) GLib.warning(@"Non-source error: '$(message)'");
       }
       else
       {
@@ -87,11 +87,11 @@ namespace Vls
       ++suppr_errors;
       if (source == null)
       {
-        GLib.error(@"Non-source error ($(message))");
+        if (logwarn) GLib.warning(@"Non-source error: '$(message)'");
       }
       else
       {
-        add_source_error(source, message, ref errors_by_file);
+        add_source_error(source, "(suppressed) " + message, ref errors_by_file);
       }
     }
 #endif

@@ -1,6 +1,6 @@
 namespace Vls
 {
-  enum ErrorCodes
+  public enum ErrorCodes
   {
     // Defined by JSON RPC
     ParseError = -32700,
@@ -18,7 +18,7 @@ namespace Vls
     ContentModified = -32801,
   }
   
-  class InitializeParams : AbstractJsonSerializableObject
+  public class InitializeParams : AbstractJsonSerializableObject
   {
     /**
      * The process Id of the parent process that started
@@ -45,7 +45,7 @@ namespace Vls
     /**
      * User provided initialization options.
      */
-    //  initializationOptions?: any;
+    public ServerConfig initializationOptions { get; set; }
   
     /**
      * The capabilities provided by the client (editor or tool)
@@ -68,7 +68,7 @@ namespace Vls
     //  workspaceFolders?: WorkspaceFolder[] | null;
   }
 
-  class InitializeResult : AbstractJsonSerializableObject
+  public class InitializeResult : AbstractJsonSerializableObject
   {
     /**
      * The capabilities the language server provides.
@@ -76,7 +76,7 @@ namespace Vls
     public ServerCapabilities capabilities { get; set; }
   }
 
-  class ServerCapabilities : AbstractJsonSerializableObject
+  public class ServerCapabilities : AbstractJsonSerializableObject
   {
     /**
      * Defines how text documents are synced. Is either a detailed structure defining each notification or
@@ -132,11 +132,11 @@ namespace Vls
      * valid if the client signals code action literal support via the property
      * `textDocument.codeAction.codeActionLiteralSupport`.
      */
-    //  codeActionProvider : boolean | CodeActionOptions;
+    public CodeActionOptions codeActionProvider { get; set; }
     /**
      * The server provides code lens.
      */
-    //  codeLensProvider : CodeLensOptions;
+    public CodeLensOptions codeLensProvider { get; set; }
     /**
      * The server provides document formatting.
      */
@@ -216,7 +216,7 @@ namespace Vls
   /**
    * Signature help options.
    */
-  class SignatureHelpOptions : AbstractJsonSerializableObject
+  public class SignatureHelpOptions : AbstractJsonSerializableObject
   {
     /**
      * The characters that trigger signature help
@@ -228,7 +228,7 @@ namespace Vls
   /**
    * Rename options
    */
-  class RenameOptions : AbstractJsonSerializableObject
+  public class RenameOptions : AbstractJsonSerializableObject
   {
     /**
      * Renames should be checked and tested before being executed.
@@ -236,7 +236,82 @@ namespace Vls
     public bool prepareProvider { get; set; }
   }
 
-  class DidChangeTextDocumentParams : AbstractJsonSerializableObject
+  /**
+   * Code Action options.
+   */
+  public class CodeActionOptions : AbstractJsonSerializableObject
+  {
+    /**
+     * CodeActionKinds that this server may return.
+     *
+     * The list of kinds may be generic, such as `CodeActionKind.Refactor`, or the server
+     * may list out every specific kind they provide.
+     */
+    public JsonSerializableCollection<CodeActionKind> codeActionKinds { get; set; }
+
+    protected override JsonSerializableCollection? create_collection(string property_name)
+    {
+      switch (property_name)
+      {
+      case "codeActionKinds":
+        return new JsonArrayList<CodeActionKind>();
+      }
+      return base.create_collection(property_name);
+    }
+  }
+
+  public class TextDocumentRegistrationOptions : AbstractJsonSerializableObject
+  {
+    /**
+     * A document selector to identify the scope of the registration. If set to null
+     * the document selector provided on the client side will be used.
+     */
+    public JsonSerializableCollection<DocumentFilter> documentSelector { get; set; }
+  }
+
+  public class DocumentFilter : AbstractJsonSerializableObject
+  {
+    /**
+     * A language id, like `typescript`.
+     */
+    public string language { get; set; }
+
+    /**
+     * A Uri [scheme](#Uri.scheme), like `file` or `untitled`.
+     */
+    public string scheme { get; set; }
+
+    /**
+     * A glob pattern, like `*.{ts,js}`.
+     *
+     * Glob patterns can have the following syntax:
+     * - `*` to match one or more characters in a path segment
+     * - `?` to match on one character in a path segment
+     * - `**` to match any number of path segments, including none
+     * - `{}` to group conditions (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
+     * - `[]` to declare a range of characters to match in a path segment (e.g., `example.[0-9]` to match on `example.0`, `example.1`, …)
+     * - `[!...]` to negate a range of characters to match in a path segment (e.g., `example.[!0-9]` to match on `example.a`, `example.b`, but not `example.0`)
+     */
+    public string pattern { get; set; }
+  }
+  
+  public class CodeLensRegistrationOptions : TextDocumentRegistrationOptions
+  {
+    /**
+     * Code lens has a resolve provider as well.
+     */
+    public bool resolveProvider { get; set; }
+  }
+  
+  public class CodeLensOptions : TextDocumentRegistrationOptions
+  {
+    /**
+     * Code lens has a resolve provider as well.
+     */
+    public bool resolveProvider { get; set; }
+  }
+
+  public class DidChangeTextDocumentParams : AbstractJsonSerializableObject
   {
     /**
      * The document that did change. The version number points
@@ -267,7 +342,7 @@ namespace Vls
    * An event describing a change to a text document. If range and rangeLength are omitted
    * the new text is considered to be the full content of the document.
    */
-  class TextDocumentContentChangeEvent : AbstractJsonSerializableObject
+  public class TextDocumentContentChangeEvent : AbstractJsonSerializableObject
   {
     /**
      * The range of the document that changed.
@@ -285,7 +360,7 @@ namespace Vls
     public string text { get; set; }
   }
 
-  class Range : AbstractJsonSerializableObject
+  public class Range : AbstractJsonSerializableObject
   {
     /**
      * The range's start position.
@@ -298,7 +373,7 @@ namespace Vls
     public Position end { get; set; }
   }
 
-  class Position : AbstractJsonSerializableObject
+  public class Position : AbstractJsonSerializableObject
   {
     /**
      * Line position in a document (zero-based).
@@ -316,7 +391,7 @@ namespace Vls
     public uint character { get; set; default = -1; }
   }
 
-  class TextDocumentPositionParams : AbstractJsonSerializableObject
+  public class TextDocumentPositionParams : AbstractJsonSerializableObject
   {
     /**
      * The text document.
@@ -328,7 +403,7 @@ namespace Vls
     public Position position { get; set; }
   }
 
-  class TextDocumentIdentifier : AbstractJsonSerializableObject
+  public class TextDocumentIdentifier : AbstractJsonSerializableObject
   {
     /**
      * The text document's URI.
@@ -336,7 +411,7 @@ namespace Vls
     public string uri { get; set; }
   }
 
-  class VersionedTextDocumentIdentifier : TextDocumentIdentifier
+  public class VersionedTextDocumentIdentifier : TextDocumentIdentifier
   {
     /**
      * The version number of this document. If a versioned text document identifier
@@ -351,13 +426,13 @@ namespace Vls
     public int version { get; set; default = -1; }
   }
 
-  class Location : AbstractJsonSerializableObject
+  public class Location : AbstractJsonSerializableObject
   {
     public string uri { get; set; }
     public Range range { get; set; }
   }
 
-  class RenameParams : AbstractJsonSerializableObject
+  public class RenameParams : AbstractJsonSerializableObject
   {
     /**
      * The document to rename.
@@ -377,7 +452,7 @@ namespace Vls
     public string newName { get; set; }
   }
 
-  class WorkspaceEdit : AbstractJsonSerializableObject
+  public class WorkspaceEdit : AbstractJsonSerializableObject
   {
     /**
      * Holds changes to existing resources.
@@ -388,7 +463,7 @@ namespace Vls
   /**
    * Defines how the host (editor) should sync document changes to the language server.
    */
-  enum TextDocumentSyncKind
+  public enum TextDocumentSyncKind
   {
     Unset = -1,
     /**
@@ -406,7 +481,7 @@ namespace Vls
     Incremental = 2
   }
 
-  class SaveOptions : AbstractJsonSerializableObject
+  public class SaveOptions : AbstractJsonSerializableObject
   {
     /**
      * The client is supposed to include the content on save.
@@ -414,7 +489,7 @@ namespace Vls
     public bool includeText { get; set; }
   }
 
-  class TextDocumentSyncOptions : AbstractJsonSerializableObject
+  public class TextDocumentSyncOptions : AbstractJsonSerializableObject
   {
     /**
      * Open and close notifications are sent to the server. If omitted open close notification should not
@@ -446,7 +521,7 @@ namespace Vls
   /**
    * Completion options.
    */
-  class CompletionOptions : AbstractJsonSerializableObject
+  public class CompletionOptions : AbstractJsonSerializableObject
   {
     /**
      * The server provides support to resolve additional
@@ -460,7 +535,7 @@ namespace Vls
     public JsonSerializableCollection<string> triggerCharacters { get; set; }
   }
 
-  class PublishDiagnosticsParams : AbstractJsonSerializableObject
+  public class PublishDiagnosticsParams : AbstractJsonSerializableObject
   {
     /**
      * The URI for which diagnostic information is reported.
@@ -473,7 +548,7 @@ namespace Vls
     public JsonSerializableCollection<Diagnostic> diagnostics { get; set; }
   }
 
-  class Diagnostic : AbstractJsonSerializableObject
+  public class Diagnostic : AbstractJsonSerializableObject
   {
     /**
      * The range at which the message applies.
@@ -503,7 +578,7 @@ namespace Vls
     public string message { get; set; }
   }
 
-  enum DiagnosticSeverity
+  public enum DiagnosticSeverity
   {
     Unset = -1,
 
@@ -528,7 +603,7 @@ namespace Vls
   /**
    * The result of a hover request.
    */
-  class Hover : AbstractJsonSerializableObject
+  public class Hover : AbstractJsonSerializableObject
   {
     /**
      * The hover's content
@@ -565,7 +640,7 @@ namespace Vls
    * *Please Note* that clients might sanitize the return markdown. A client could decide to
    * remove HTML from the markdown to avoid script execution.
    */
-  class MarkupContent : AbstractJsonSerializableObject
+  public class MarkupContent : AbstractJsonSerializableObject
   {
     public const string KIND_PLAIN_TEXT = "plaintext";
     public const string KIND_MARKDOWN = "markdown";
@@ -574,7 +649,7 @@ namespace Vls
     public string value { get; set; }
   }
 
-  class CompletionParams : TextDocumentPositionParams
+  public class CompletionParams : TextDocumentPositionParams
   {
     /**
      * The completion context. This is only available if the client specifies
@@ -583,7 +658,7 @@ namespace Vls
     public CompletionContext context { get; set; }
   }
 
-  class CompletionContext : AbstractJsonSerializableObject
+  public class CompletionContext : AbstractJsonSerializableObject
   {
     /**
      * How the completion was triggered.
@@ -596,7 +671,7 @@ namespace Vls
     public string triggerCharacter { get; set; }
   }
 
-  enum CompletionTriggerKind
+  public enum CompletionTriggerKind
   {
     Unset = -1,
     /**
@@ -619,7 +694,7 @@ namespace Vls
    * Represents a collection of [completion items](#CompletionItem) to be presented
    * in the editor.
    */
-  class CompletionList : AbstractJsonSerializableObject
+  public class CompletionList : AbstractJsonSerializableObject
   {
     /**
      * This list is not complete. Further typing should result in recomputing
@@ -632,7 +707,7 @@ namespace Vls
     public JsonSerializableCollection<CompletionItem> items { get; set; }
   }
 
-  class CompletionItem : AbstractJsonSerializableObject
+  public class CompletionItem : AbstractJsonSerializableObject
   {
     /**
      * The label of this completion item. By default
@@ -741,7 +816,7 @@ namespace Vls
   /**
    * The kind of a completion entry.
    */
-  enum CompletionItemKind
+  public enum CompletionItemKind
   {
     Unset = -1,
     Text = 1,
@@ -771,7 +846,7 @@ namespace Vls
     TypeParameter = 25
   }
 
-  class DocumentSymbolParams : AbstractJsonSerializableObject
+  public class DocumentSymbolParams : AbstractJsonSerializableObject
   {
     /**
      * The text document.
@@ -784,7 +859,7 @@ namespace Vls
    * hierarchical and they have two ranges: one that encloses its definition and one that points to its most interesting range,
    * e.g. the range of an identifier.
    */
-  class DocumentSymbol : AbstractJsonSerializableObject
+  public class DocumentSymbol : AbstractJsonSerializableObject
   {
     /**
      * The name of this symbol. Will be displayed in the user interface and therefore must not be
@@ -829,7 +904,7 @@ namespace Vls
   /**
    * A symbol kind.
    */
-  enum SymbolKind
+  public enum SymbolKind
   {
     Unset = -1,
     File = 1,
@@ -860,7 +935,7 @@ namespace Vls
     TypeParameter = 26
   }
 
-  class TextEdit : AbstractJsonSerializableObject
+  public class TextEdit : AbstractJsonSerializableObject
   {
     /**
      * The range of the text document to be manipulated. To insert
@@ -875,7 +950,7 @@ namespace Vls
     public string newText { get; set; }
   }
 
-  class Command : AbstractJsonSerializableObject
+  public class Command : AbstractJsonSerializableObject
   {
     /**
      * Title of the command, like `save`.
@@ -896,7 +971,7 @@ namespace Vls
    * Defines whether the insert text in a completion item should be interpreted as
    * plain text or a snippet.
    */
-  enum InsertTextFormat
+  public enum InsertTextFormat
   {
     Unset = -1,
     /**
@@ -919,7 +994,7 @@ namespace Vls
    * callable. There can be multiple signature but only one
    * active and only one active parameter.
    */
-  class SignatureHelp : AbstractJsonSerializableObject
+  public class SignatureHelp : AbstractJsonSerializableObject
   {
     /**
      * One or more signatures.
@@ -964,7 +1039,7 @@ namespace Vls
    * can have a label, like a function-name, a doc-comment, and
    * a set of parameters.
    */
-  class SignatureInformation : AbstractJsonSerializableObject
+  public class SignatureInformation : AbstractJsonSerializableObject
   {
     /**
      * The label of this signature. Will be shown in
@@ -998,7 +1073,7 @@ namespace Vls
    * Represents a parameter of a callable-signature. A parameter can
    * have a label and a doc-comment.
    */
-  class ParameterInformation : AbstractJsonSerializableObject
+  public class ParameterInformation : AbstractJsonSerializableObject
   {
     /**
      * The label of this parameter information.
@@ -1019,12 +1094,12 @@ namespace Vls
     public string documentation { get; set; }
   }
 
-  class ReferenceParams : TextDocumentPositionParams
+  public class ReferenceParams : TextDocumentPositionParams
   {
     public ReferenceContext context { get; set; }
   }
 
-  class ReferenceContext : AbstractJsonSerializableObject
+  public class ReferenceContext : AbstractJsonSerializableObject
   {
     /**
      * Include the declaration of the current symbol.
@@ -1032,7 +1107,276 @@ namespace Vls
     public bool includeDeclaration { get; set; }
   }
 
-  //  class ShowMessageParams : AbstractJsonSerializableObject
+  /**
+  * Params for the CodeActionRequest
+  */
+  public class CodeActionParams : AbstractJsonSerializableObject
+  {
+    /**
+    * The document in which the command was invoked.
+    */
+    public TextDocumentIdentifier textDocument { get; set; }
+
+    /**
+    * The range for which the command was invoked.
+    */
+    public Range range { get; set; }
+
+    /**
+    * Context carrying additional information.
+    */
+    public CodeActionContext context { get; set; }
+  }
+
+  public enum CodeActionKindEnum
+  {
+    Unset = -1,
+    /**
+    * Empty kind.
+    */
+    Empty,
+
+    /**
+    * Base kind for quickfix actions: 'quickfix'
+    */
+    QuickFix,
+
+    /**
+    * Base kind for refactoring actions: 'refactor'
+    */
+    Refactor,
+
+    /**
+    * Base kind for refactoring extraction actions: 'refactor.extract'
+    *
+    * Example extract actions:
+    *
+    * - Extract method
+    * - Extract function
+    * - Extract variable
+    * - Extract interface from class
+    * - ...
+    */
+    RefactorExtract,
+
+    /**
+    * Base kind for refactoring inline actions: 'refactor.inline'
+    *
+    * Example inline actions:
+    *
+    * - Inline function
+    * - Inline variable
+    * - Inline constant
+    * - ...
+    */
+    RefactorInline,
+
+    /**
+    * Base kind for refactoring rewrite actions: 'refactor.rewrite'
+    *
+    * Example rewrite actions:
+    *
+    * - Convert JavaScript function to class
+    * - Add or remove parameter
+    * - Encapsulate field
+    * - Make method static
+    * - Move method to base class
+    * - ...
+    */
+    RefactorRewrite,
+
+    /**
+    * Base kind for source actions: `source`
+    *
+    * Source code actions apply to the entire file.
+    */
+    Source,
+
+    /**
+    * Base kind for an organize imports source action: `source.organizeImports`
+    */
+    SourceOrganizeImports;
+
+    public static CodeActionKindEnum from_json(string? value)
+    {
+      switch (value)
+      {
+      case "": return CodeActionKindEnum.Empty;
+      case "quickfix": return CodeActionKindEnum.QuickFix;
+      case "refactor": return CodeActionKindEnum.Refactor;
+      case "refactor.extract": return CodeActionKindEnum.RefactorExtract;
+      case "refactor.inline": return CodeActionKindEnum.RefactorInline;
+      case "refactor.rewrite": return CodeActionKindEnum.RefactorRewrite;
+      case "source": return CodeActionKindEnum.Source;
+      case "source.organizeImports": return CodeActionKindEnum.SourceOrganizeImports;
+      default: return CodeActionKindEnum.Unset;
+      }
+    }
+
+    public string? to_json()
+    {
+      switch (this)
+      {
+      case CodeActionKindEnum.Empty: return "";
+      case CodeActionKindEnum.QuickFix: return "quickfix";
+      case CodeActionKindEnum.Refactor: return "refactor";
+      case CodeActionKindEnum.RefactorExtract: return "refactor.extract";
+      case CodeActionKindEnum.RefactorInline: return "refactor.inline";
+      case CodeActionKindEnum.RefactorRewrite: return "refactor.rewrite";
+      case CodeActionKindEnum.Source: return "source";
+      case CodeActionKindEnum.SourceOrganizeImports: return "source.organizeImports";
+      default: return null;
+      }
+    }
+  }
+
+  public class CodeActionKind : Object, JsonSerializableValue
+  {
+    public CodeActionKindEnum value { get; set; }
+
+    public CodeActionKind(CodeActionKindEnum value)
+    {
+      this.value = value;
+    }
+
+    public Json.Node serialize()
+    {
+      var node = new Json.Node(Json.NodeType.VALUE);
+      node.set_string(value.to_json());
+      return node;
+    }
+
+    public bool deserialize(Json.Node node)
+    {
+      if (node.get_node_type() != Json.NodeType.VALUE)
+      {
+        return false;
+      }
+      value = CodeActionKindEnum.from_json(node.get_string());
+      return true;
+    }
+  }
+
+  /**
+   * Contains additional diagnostic information about the context in which
+   * a code action is run.
+   */
+  public class CodeActionContext : AbstractJsonSerializableObject
+  {
+    /**
+     * An array of diagnostics.
+     */
+    public JsonSerializableCollection<Diagnostic> diagnostics { get; set; }
+
+    /**
+     * Requested kind of actions to return.
+     *
+     * Actions not of this kind are filtered out by the client before being shown. So servers
+     * can omit computing them.
+     */
+    public JsonSerializableCollection<CodeActionKind> only { get; set; }
+
+    protected override JsonSerializableCollection? create_collection(string property_name)
+    {
+      switch (property_name)
+      {
+      case "diagnostics":
+        return new JsonArrayList<Diagnostic>();
+      case "only":
+        return new JsonArrayList<CodeActionKind>();
+      }
+      return base.create_collection(property_name);
+    }
+  }
+
+  /**
+   * A code action represents a change that can be performed in code, e.g. to fix a problem or
+   * to refactor code.
+   *
+   * A CodeAction must set either `edit` and/or a `command`. If both are supplied, the `edit` is applied first, then the `command` is executed.
+   */
+  public class CodeAction : AbstractJsonSerializableObject
+  {
+    /**
+     * A short, human-readable, title for this code action.
+     */
+    public string title { get; set; }
+
+    /**
+     * The kind of the code action.
+     *
+     * Used to filter code actions.
+     */
+    public CodeActionKind kind { get; set; }
+
+    /**
+     * The diagnostics that this code action resolves.
+     */
+    public JsonSerializableCollection<Diagnostic> diagnostics { get; set; }
+
+    /**
+     * The workspace edit this code action performs.
+     */
+    public WorkspaceEdit edit { get; set; }
+
+    /**
+     * A command this code action executes. If a code action
+     * provides an edit and a command, first the edit is
+     * executed and then the command.
+     */
+    public Command command { get; set; }
+
+    protected override JsonSerializableCollection? create_collection(string property_name)
+    {
+      switch (property_name)
+      {
+      case "diagnostics":
+        return new JsonArrayList<Diagnostic>();
+      }
+      return base.create_collection(property_name);
+    }
+  }
+  
+  public class CodeLensParams : AbstractJsonSerializableObject
+  {
+    /**
+     * The document to request code lens for.
+     */
+    public TextDocumentIdentifier textDocument { get; set; }
+  }
+
+  /**
+   * A code lens represents a command that should be shown along with
+   * source text, like the number of references, a way to run tests, etc.
+   *
+   * A code lens is _unresolved_ when no command is associated to it. For performance
+   * reasons the creation of a code lens and resolving should be done in two stages.
+   */
+   public class CodeLens : AbstractJsonSerializableObject
+   {
+     /**
+      * The range in which this code lens is valid. Should only span a single line.
+      */
+     public Range range { get; set; }
+
+     /**
+      * The command this code lens represents.
+      */
+     public Command command { get; set; }
+
+     /**
+      * A data entry field that is preserved on a code lens item between
+      * a code lens and a code lens resolve request.
+      */
+     public CodeLensData data { get; set; }
+   }
+
+   public class CodeLensData : AbstractJsonSerializableObject
+   {
+     public TextDocumentIdentifier textDocument { get; set; }
+   }
+
+  //  public class ShowMessageParams : AbstractJsonSerializableObject
   //  {
   //    /**
   //     * The message type. See {@link MessageType}.
@@ -1045,7 +1389,7 @@ namespace Vls
   //    public string message { get; set; }
   //  }
 
-  //  enum MessageType
+  //  public enum MessageType
   //  {
   //    Unset = -1,
   //    /**

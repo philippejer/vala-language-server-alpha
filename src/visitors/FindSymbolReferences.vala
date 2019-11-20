@@ -1,12 +1,11 @@
 namespace Vls
 {
-  class FindSymbolReferences : FindNode
+  public class FindSymbolReferences : FindNode
   {
-    protected Vala.CodeContext context;
-    protected Vala.Symbol target_symbol;
-    protected bool include_target_symbol;
+    private Vala.CodeContext context;
+    private Vala.Symbol target_symbol;
+    private bool include_target_symbol;
 
-    protected Gee.HashSet<Vala.CodeNode> found_nodes = new Gee.HashSet<Vala.CodeNode>();
     public Gee.ArrayList<Vala.CodeNode> references = new Gee.ArrayList<Vala.CodeNode>();
 
     public FindSymbolReferences(Vala.CodeContext context, Vala.Symbol target_symbol, bool include_target_symbol)
@@ -21,27 +20,38 @@ namespace Vls
       context.accept(this);
     }
 
-    protected override void check_node(Vala.CodeNode node)
+    protected override bool check_node(Vala.CodeNode node)
     {
-      var source_reference = node.source_reference;
-      if (source_reference == null)
+      if (is_package_code_node(node))
       {
-        return;
+        if (logsilly) debug(@"Ignoring non-source node: '$(code_node_to_string(node))'");
+        return false;
       }
 
-      if (found_nodes.contains(node))
-      {
-        return;
-      }
-      found_nodes.add(node);
+      Vala.Symbol? symbol_base = get_symbol_reference(node, false);
 
-      Vala.Symbol? symbol = get_referenced_symbol(node);
-
-      if ((include_target_symbol || (node != target_symbol)) && symbol == target_symbol)
+      if (symbol_base == target_symbol)
       {
-        if (loginfo) info(@"Found reference ($(code_node_to_string(node)))");
+        if (!include_target_symbol)
+        {        
+          if (node == target_symbol)
+          {
+            return true;
+          }
+
+          Vala.Symbol? symbol_override = get_symbol_reference(node, true);          
+          if (node == symbol_override)
+          {
+            // Typically, this happens when the node references an override of the target method
+            return true;
+          }
+        }
+        
+        if (loginfo) info(@"Found target symbol reference: '$(code_node_to_string(node))'");
         references.add(node);
       }
+
+      return true;
     }
   }
 }

@@ -1,6 +1,6 @@
 namespace Vls
 {
-  class SourceFile : Object
+  public class SourceFile : Object
   {
     public string filename;
     public string uri;
@@ -33,7 +33,7 @@ namespace Vls
 /**
  * The point of this class is to refresh the Vala.CodeContext instead of rebuilding it from scratch.
  */
-  class Context
+  public class Context
   {
 
     public Vala.CodeContext code_context { get; private set; }
@@ -47,12 +47,14 @@ namespace Vls
 
 #if LIBVALA_EXP
     public bool exp_public_by_default { get; set; default = false; }
+    public bool exp_internal_by_default { get; set; default = false; }
     public bool exp_float_by_default { get; set; default = false; }
     public bool exp_optional_semicolons { get; set; default = false; }
     public bool exp_optional_parens { get; set; default = false; }
     public bool exp_conditional_attribute { get; set; default = false; }
     public bool exp_forbid_delegate_copy { get; set; default = false; }
-    public bool exp_no_implicit_namespace { get; set; default = false; }
+    public bool exp_disable_implicit_namespace { get; set; default = false; }
+    public bool exp_integer_literal_separator { get; set; default = false; }
 #endif
 
     public Context()
@@ -150,12 +152,14 @@ namespace Vls
       
 #if LIBVALA_EXP
       code_context.exp_public_by_default = exp_public_by_default;
+      code_context.exp_internal_by_default = exp_internal_by_default;
       code_context.exp_float_by_default = exp_float_by_default;
       code_context.exp_optional_semicolons = exp_optional_semicolons;
       code_context.exp_optional_parens = exp_optional_parens;
       code_context.exp_conditional_attribute = exp_conditional_attribute;
       code_context.exp_forbid_delegate_copy = exp_forbid_delegate_copy;
-      code_context.exp_no_implicit_namespace = exp_no_implicit_namespace;
+      code_context.exp_disable_implicit_namespace = exp_disable_implicit_namespace;
+      code_context.exp_integer_literal_separator = exp_integer_literal_separator;
 
       // This flag allows the parser to continue on trivial syntax errors
       code_context.exp_resilient_parser = true;
@@ -201,7 +205,7 @@ namespace Vls
         if (source_file == null)
         {
           // This source file does not come from the build file, which means it comes from an external package
-          if (loginfo) info(@"Adding source file from packages ($(filename)) ($(uri))");
+          if (loginfo) info(@"Adding source file '$(filename)' from packages");
           source_file = new SourceFile(filename, uri, true);
           add_source_file(source_file);
         }

@@ -220,6 +220,23 @@ namespace Vls
       base.wrap((owned)items, (owned)equal_func);
     }
 
+    public JsonArrayList<T> add_item(T item)
+    {
+      add(item);
+      return this;
+    }
+
+    public JsonArrayList<T> add_items(T first_item, ...)
+    {
+      add(first_item);
+      var args = va_list();
+      for (T? item = args.arg<T?>(); item != null; item = args.arg<T?>())
+      {
+        add(item);
+      }
+      return this;
+    }
+
     public Json.Node serialize()
     {
       return JsonSerializableCollection<T>.serialize_collection(this);

@@ -1,0 +1,23 @@
+{
+	"title": "JSON schema for Vala Language Server lints",
+	"$schema": "http://json-schema.org/draft-04/schema#",
+
+	"definitions": {
+		"level": {
+      "description": "Determines the error level",
+			"type": "string",
+			"enum": [ "error", "warn", "info", "hint", "ignore" ]
+		}
+	},
+
+	"properties": {
+		"no-implicit-this-access": {
+			"description": "This rule checks that every access to 'this' is explicit. [default level: ignore]",
+			"allOf": [ { "$ref": "#/definitions/level" } ]
+		},
+		"no-unqualified-static-access": {
+			"description": "This rule checks that every access to static class members is explicit. [default level: ignore]",
+			"allOf": [ { "$ref": "#/definitions/level" } ]
+		}
+	}
+}
