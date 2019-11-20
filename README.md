@@ -142,6 +142,9 @@ Vversion 0.50+ is required by the language server for build file introspection (
 
 ### Compile the language server
 
+* Installed required dependencies
+  * `pacman -S mingw-w64-x86_64-glib2 mingw-w64-x86_64-jsonrpc-glib mingw-w64-x86_64-libgee`
+* Note: for some time the JSON-RPC package [did not come with the VAPI](https://github.com/msys2/MINGW-packages/issues/5860), this is fixed as of version 3.34.0-3.
 * Clone the repo
   * `git clone 'https://github.com/philippejer/vala-language-server-alpha.git'`
 * Build
