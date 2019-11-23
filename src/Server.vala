@@ -1009,7 +1009,7 @@ namespace Vls
         return;
       }
 
-      Location location = get_symbol_location(symbol, symbol, false);
+      Location? location = get_symbol_location(symbol, symbol, false);
       if (location == null)
       {
         client.reply(id, null);
@@ -1163,7 +1163,7 @@ namespace Vls
       var locations = new JsonArrayList<Location>();
       foreach (Vala.CodeNode node in references)
       {
-        Location location = get_symbol_location(node, symbol, false);
+        Location? location = get_symbol_location(node, symbol, false);
         if (location == null)
         {
           continue;
@@ -1241,14 +1241,14 @@ namespace Vls
         }
       }
 
-      Location? symbol_location = get_symbol_location(symbol, symbol, false);
-      if (symbol_location == null)
+      Location? location = get_symbol_location(symbol, symbol, false);
+      if (location == null)
       {
         if (loginfo) info(@"Cannot rename symbol '$(code_node_to_string(symbol))', symbol location does not contain symbol name");
         return null;
       }
 
-      return symbol_location.range;
+      return location.range;
     }
 
     private void on_textDocument_rename(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
@@ -1284,7 +1284,7 @@ namespace Vls
 
       foreach (Vala.CodeNode node in references)
       {
-        Location location = get_symbol_location(node, symbol, true);
+        Location? location = get_symbol_location(node, symbol, true);
 
         var other_symbol = get_symbol_from_code_node_scope(node, rename_params.newName);
         if (other_symbol != null)
@@ -1484,13 +1484,16 @@ namespace Vls
         return null;
       }
 
-      // Get the base symbol to find every reference
-      Vala.Symbol base_symbol = get_symbol_reference(symbol, false);
-
+      // Get the base symbol to find every reference (note: this will not return null for this input)
+      Vala.Symbol? base_symbol = get_symbol_reference(symbol, false);
       Gee.ArrayList<Vala.CodeNode> references = find_symbol_references(base_symbol, false);
+
+      // Find the exact location of the symbol name to position the cursor      
+      Location? location = get_symbol_location(symbol, symbol, false);
       var arguments = new JsonArrayList<string>();
-      arguments.add(code_lens.range.start.line.to_string());
-      arguments.add(code_lens.range.start.character.to_string());
+      arguments.add(location.range.start.line.to_string());
+      arguments.add(location.range.start.character.to_string());
+
       return new Command()
         {
           title = @"$(references.size) reference$(references.size == 1 ? "" : "s")",

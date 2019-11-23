@@ -28,9 +28,9 @@ namespace Vls
         return false;
       }
 
-      Vala.Symbol? symbol_base = get_symbol_reference(node, false);
-
-      if (symbol_base == target_symbol)
+      // Get the base symbol to find every reference
+      Vala.Symbol? base_symbol = get_symbol_reference(node, false);      
+      if (base_symbol == target_symbol)
       {
         if (!include_target_symbol)
         {        
@@ -39,8 +39,8 @@ namespace Vls
             return true;
           }
 
-          Vala.Symbol? symbol_override = get_symbol_reference(node, true);          
-          if (node == symbol_override)
+          Vala.Symbol? derived_symbol = get_symbol_reference(node, true);          
+          if (node == derived_symbol)
           {
             // Typically, this happens when the node references an override of the target method
             return true;
