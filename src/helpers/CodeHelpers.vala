@@ -313,15 +313,19 @@ namespace Vls
     if (prefer_override && node is Vala.MemberAccess)
     {
       var expr = (Vala.MemberAccess)node;
-      if (expr.inner != null && expr.inner.symbol_reference != null)
+      if (expr.inner != null)
       {
-        // Specific case for MemberAccess expressions: search for a more specific definition of the member
-        // (Otherwise the symbol for the expression will be the top-level declaration)
-        Vala.Symbol? symbol = null;
-        if (probe_symbol_table_with_base_types(expr.inner.symbol_reference, expr.member_name, SymbolFlags.ALL, ref symbol))
+        Vala.Symbol? inner_type = get_expression_type(expr.inner);
+        if (inner_type != null)
         {
-          if (logdebug) debug(@"MemberAccess has symbol reference: '$(code_node_to_string(node))'");
-          return symbol;
+          // Specific case for MemberAccess expressions: search for a more specific definition of the member
+          // (Otherwise the symbol for the expression will be the top-level declaration)
+          Vala.Symbol? symbol = null;
+          if (probe_symbol_table_with_base_types(inner_type, expr.member_name, SymbolFlags.ALL, ref symbol))
+          {
+            if (logdebug) debug(@"MemberAccess has symbol reference: '$(code_node_to_string(node))'");
+            return symbol;
+          }
         }
       }
     }
@@ -620,6 +624,68 @@ namespace Vls
     Type symbol_type = Type.from_instance(symbol);
     unowned string name = symbol_type_names[symbol_type];
     return name ?? symbol_type.name();
+  }
+
+  /** Returns the ancestor type (root of the class/struct tree) of 'symbol'. */
+  public Vala.Symbol get_ancestor_type(Vala.Symbol? symbol)
+  {
+    Vala.Symbol? base_type = get_parent_type(symbol);
+    return base_type == null ? symbol : get_ancestor_type(base_type);
+  }
+
+  /** Returns the parent type of 'symbol'. */
+  public Vala.Symbol? get_parent_type(Vala.Symbol? symbol)
+  {
+    if (symbol == null)
+    {
+      return null;
+    }
+    if (symbol is Vala.Class)
+    {
+      return ((Vala.Class)symbol).base_class;
+    }
+    if (symbol is Vala.Struct)
+    {
+      return ((Vala.Struct)symbol).base_struct;
+    }
+    return null;
+  }
+
+  /**
+   * Returns the type symbol of the specified expression.
+   * Also sets 'is_instance' based on whether the expression denotes an instance of the type or the type itself.
+   */
+  public Vala.Symbol? get_expression_type(Vala.Expression expr, out bool? is_instance = null)
+  {
+    is_instance = false;
+    Vala.Symbol? symbol = expr.symbol_reference;
+    if (symbol is Vala.TypeSymbol || symbol is Vala.Namespace)
+    {
+      // Expression references a symbol which is a static type or namespace (not an instance of a type)
+      if (logdebug) debug(@"Expression references static type: '$(code_node_to_string(symbol))'");
+      if (expr is Vala.BaseAccess)
+      {
+        // Special case for 'base' access
+        is_instance = true;
+      }
+      return symbol;
+    }
+    Vala.Variable? variable = symbol as Vala.Variable;
+    if (variable != null && variable.variable_type != null && variable.variable_type.data_type != null)
+    {
+      // Expression references a symbol which is an instance of a type
+      if (logdebug) debug(@"Expression references a variable: '$(code_node_to_string(variable))'");
+      is_instance = true;
+      return variable.variable_type.data_type;
+    }
+    if (expr.value_type != null && expr.value_type.data_type != null)
+    {
+      // Expression does not reference a symbol but the compiler has been able to infer its type
+      if (logdebug) debug(@"Expression does not reference a symbol but has a type: '$(code_node_to_string(expr.value_type.data_type))'");
+      is_instance = true;
+      return expr.value_type.data_type;
+    }
+    return null;
   }
 
   /** Converts a 'SourceReference' to a 'Location'. */

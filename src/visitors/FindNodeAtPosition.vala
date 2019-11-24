@@ -12,11 +12,6 @@ namespace Vls
       this.column = column;
     }
 
-    protected override bool check_node(Vala.CodeNode node)
-    {
-      return base.check_node(node);
-    }
-
     protected override void check_node_in_file(Vala.CodeNode node)
     {
       var source_reference = node.source_reference;      
