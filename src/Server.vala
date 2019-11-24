@@ -1178,11 +1178,7 @@ namespace Vls
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
-#if LIBVALA_EXP
-      if (reporter == null || reporter.get_errors()  > 0 || reporter.get_suppr_errors() > 0)
-#else
-      if (reporter == null || reporter.get_errors()  > 0)
-#endif
+      if (context_has_errors())
       {
         client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, "Cannot rename because of compilation errors", null);
         return;
@@ -1412,6 +1408,12 @@ namespace Vls
       string uri = sanitize_file_uri(textDocument.uri);
       if (loginfo) info(@"Searching code lens symbols, URI: '$(uri)'");
 
+      if (context_has_errors())
+      {
+        if (loginfo) info(@"Cannot search code lens because of compilation errors");
+        return null;
+      }
+
       SourceFile? source_file = get_source_file(uri);
       if (source_file == null) return null;
 
@@ -1500,6 +1502,20 @@ namespace Vls
           command = "vls.show.references",
           arguments = arguments
         };
+    }
+
+    private bool context_has_errors()
+    {
+
+    #if LIBVALA_EXP
+      if (reporter == null || reporter.get_errors() > 0 || reporter.get_suppr_errors() > 0)
+    #else
+      if (reporter == null || reporter.get_errors() > 0)
+    #endif
+      {
+        return true;
+      }
+      return false;
     }
 
     private void on_shutdown(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
