@@ -1490,6 +1490,14 @@ namespace Vls
       Vala.Symbol? base_symbol = get_symbol_reference(symbol, false);
       Gee.ArrayList<Vala.CodeNode> references = find_symbol_references(base_symbol, false);
 
+      if (references.size == 0)
+      {
+        return new Command()
+        {
+          title = "0 references"
+        };
+      }
+
       // Find the exact location of the symbol name to position the cursor      
       Location? location = get_symbol_location(symbol, symbol, false);
       var arguments = new JsonArrayList<string>();
