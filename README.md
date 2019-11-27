@@ -1,16 +1,23 @@
 # Basic Language Server for Vala
 
-## Foreword
+## About the state of Vala Language Servers (2019-11-27)
 
-To be clear, the goal of this tool is to get 90% of the job done in as little code as possible. Otherwise, it would not be manageable since for me this is only a tool and not a goal in itself (although it has been quite a fun project).
+I have started this project around july 2019 because I could not find a working language server on my setup (VSCode and MinGW). [This project](https://github.com/benwaffle/vala-language-server) from Ben Iofel seemed like a good starting point, so I have started modifying it with the intent of improving a few things (mostly wanted to get "go to definition" working correctly on my setup).
 
-I do not intend to go the last 10% percent here because that would require exponentially more work (but I will gladly do my best to fix bugs and do simple improvements on the existing features).
+Since then, I have added quite a few features like basic completion support (in a very quick & dirty mode), and have been quite happy with the result. So I finally decided to publish it here in the hope that it would be useful to someone else.
 
-Now, obviously anyone can fork the code and extend it but I think middle/long term development should really go towards [the original project](https://github.com/benwaffle/vala-language-server), which has a broader scope (like supporting other IDEs, other build systems, etc.).
+However since then, two language server projects have seen a lot of activity:
 
-I certainly hope to have the time to contribute some PRs there.
+- The original project from Ben Iofel, which seems to primarily target Vim: https://github.com/benwaffle/vala-language-server
+- The GVls language server from Daniel Espinosa Ortiz, which seems to primarily target Gedit: https://gitlab.gnome.org/esodan/gvls
 
-Also please note that this tool currently assumes that the client IDE is the latest version of VS Code and that the project is built with Meson 0.50+ (the project must have a valid `meson.build` file). It also should be built against a recent version of Vala due to various improvements and bugfixes made recently (step-by-step Ubuntu and MinGW-64 instructions detailed below).
+I have not yet had the time to check these projects out and see at what stage of maturity they are. GVls in particular has seen a lot of activity recently and the code looks very clean and professional, also the author clearly has a lot of experience in the Vala/GNOME ecosystem.
+
+Since I do not intend to develop this project much further (aside from simple bug fixes and maybe some experiments), I would strongly advise to look at these two projects first and only use this one if they do not work for you.
+
+## Prerequisites
+
+Please note that this tool primarily targets VSCode as the client IDE and the project should ideally use Meson 0.50+ (the server will search for a valid `meson-info/intro-targets.json` file to determine the sources and compiler flags). It should also be built against a recent version of Vala (currently using version 0.46.3), since the Vala compiler API can change across versions (I have provided some step-by-step Ubuntu and MinGW-64 instructions below).
 
 2019-10-20: A fallback is now available by adding a `vala-language-server.json` configuration file under the project root directory. This file will be detected and used to configure the list of sources files and/or directories and the compiler parameters (it is possible to simply copy the Vala compiler command line from e.g. `compile_commands.json`). An example configuration can be found [here](https://github.com/philippejer/vala-language-server-alpha/blob/master/vala-language-server-test.json).
 
