@@ -1,8 +1,8 @@
 namespace Vls
 {
-  public delegate void Action() throws Error;
+  public delegate void ActionFunc() throws Error;
 
-  public void show_elapsed_time(string label, Action action) throws Error
+  public void show_elapsed_time(string label, ActionFunc action) throws Error
   {
     var timer = new Timer();
     timer.start();

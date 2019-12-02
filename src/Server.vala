@@ -123,13 +123,13 @@ namespace Vls
 
   public void update_server_config(ServerConfig config)
   {
+    if (loginfo) info(@"Update server config");
     loglevel = config.logLevel;
     logdebug = (loglevel >= LogLevel.DEBUG);
     loginfo = (loglevel >= LogLevel.INFO);
     logwarn = (loglevel >= LogLevel.WARN);
     method_completion_mode = config.methodCompletionMode;
     references_code_lens_enabled = config.referencesCodeLensEnabled;
-    if (loginfo) info(@"Updated server config");
   }
 
   public class BuildConfig : AbstractJsonSerializableObject
@@ -259,9 +259,10 @@ namespace Vls
 
   public class Server
   {
-    const int check_diagnostics_period_ms = 200;
-    const int64 publish_diagnostics_delay_inc_us = 200 * 1000;
-    const int64 publish_diagnostics_delay_max_us = 1000 * 1000;
+    const uint check_update_context_period_ms = 200;
+    const int64 update_context_delay_inc_us = 200 * 1000;
+    const int64 update_context_delay_max_us = 1000 * 1000;
+    const uint wait_context_update_delay_ms = 1000;
     const int monitor_file_period_ms = 2500;
 
     private static Server server = null;
@@ -319,6 +320,9 @@ namespace Vls
         {
           switch (method)
           {
+          case "$/cancelRequest":
+            on_cancelRequest(client, @params);
+            break;
           case "textDocument/didOpen":
             on_textDocument_didOpen(client, @params);
             break;
@@ -351,43 +355,43 @@ namespace Vls
           switch (method)
           {
           case "initialize":
-            on_initialize(client, method, id, @params);
+            on_initialize(client, id, @params);
             return true;
           case "shutdown":
-            on_shutdown(client, method, id, @params);
+            on_shutdown(client, id, @params);
             return true;
           case "textDocument/definition":
-            on_textDocument_definition(client, method, id, @params);
+            on_textDocument_definition(client, id, @params);
             return true;
           case "textDocument/hover":
-            on_textDocument_hover(client, method, id, @params);
+            on_textDocument_hover(client, id, @params);
             return true;
           case "textDocument/completion":
-            on_textDocument_completion(client, method, id, @params);
+            on_textDocument_completion(client, id, @params);
             return true;
           case "textDocument/signatureHelp":
-            on_textDocument_signatureHelp(client, method, id, @params);
+            on_textDocument_signatureHelp(client, id, @params);
             return true;
           case "textDocument/references":
-            on_textDocument_references(client, method, id, @params);
+            on_textDocument_references(client, id, @params);
             return true;
           case "textDocument/prepareRename":
-            on_textDocument_prepareRename(client, method, id, @params);
+            on_textDocument_prepareRename(client, id, @params);
             return true;
           case "textDocument/rename":
-            on_textDocument_rename(client, method, id, @params);
+            on_textDocument_rename(client, id, @params);
             return true;
           case "textDocument/documentSymbol":
-            on_textDocument_documentSymbol(client, method, id, @params);
+            on_textDocument_documentSymbol(client, id, @params);
             return true;
           case "textDocument/codeAction":
-            on_textDocument_codeAction(client, method, id, @params);
+            on_textDocument_codeAction(client, id, @params);
             return true;
           case "textDocument/codeLens":
-            on_textDocument_codeLens(client, method, id, @params);
+            on_textDocument_codeLens(client, id, @params);
             return true;
           case "codeLens/resolve":
-            on_codeLens_resolve(client, method, id, @params);
+            on_codeLens_resolve(client, id, @params);
             return true;
           default:
             if (loginfo) info(@"No call handler for method '$(method)'");
@@ -403,11 +407,11 @@ namespace Vls
         }
       });
 
-      Timeout.add(check_diagnostics_period_ms, () =>
+      Timeout.add(check_update_context_period_ms, () =>
       {
         try
         {
-          check_publishDiagnostics();
+          check_update_context();
         }
         catch (Error err)
         {
@@ -417,7 +421,7 @@ namespace Vls
       });
     }
 
-    private void on_initialize(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_initialize(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var initialize_params = variant_to_object<InitializeParams>(@params);
 
@@ -431,7 +435,7 @@ namespace Vls
       string root_path = Filename.from_uri(root_uri);
       if (loginfo) info(@"Initialize request received, root path: '$(root_path)'");
 
-      // Check for the build file with the list of sources and compilation flags 
+      // Check for the build file with the list of sources and compilation flags
       string? build_file = find_file_in_dir(root_path, "vala-language-server.json");
       if (build_file != null)
       {
@@ -443,13 +447,13 @@ namespace Vls
         {
           if (loginfo) info(@"Build file '$(build_file)' has changed, reanalyzing...");
           analyze_build_file(root_path, build_file);
-          request_publishDiagnostics(client);
+          request_update_context(client);
         });
       }
       else
       {
         if (loginfo) info(@"No build file 'vala-language-server.json' found, searching for Meson info");
-        
+
         string? meson_info_dir = find_file_in_dir(root_path, "meson-info", FileTest.IS_DIR);
         if (meson_info_dir == null)
         {
@@ -469,7 +473,7 @@ namespace Vls
         {
           if (loginfo) info(@"Meson targets file '$(targets_file)' has changed, reanalyzing...");
           analyze_meson_targets(root_path, targets_file);
-          request_publishDiagnostics(client);
+          request_update_context(client);
         });
       }
 
@@ -484,7 +488,7 @@ namespace Vls
         {
           if (loginfo) info(@"Lint config file '$(lint_config_file)' has changed, reanalyzing...");
           analyze_lint_config_file(root_path, lint_config_file);
-          request_publishDiagnostics(client);
+          request_update_context(client);
         });
       }
       else
@@ -533,10 +537,10 @@ namespace Vls
       };
       client.reply(id, object_to_variant(result));
 
-      send_publishDiagnostics(client);
+      update_context(client);
     }
 
-    private void monitor_file(string file, bool when_stable, owned Action action)
+    private void monitor_file(string file, bool when_stable, owned ActionFunc action)
     {
       time_t init_file_time = get_file_time(file);
       time_t last_file_time = init_file_time;
@@ -642,7 +646,7 @@ namespace Vls
       catch (Error err)
       {
         throw new VlsError.FAILED(@"Could not parse Meson targets file '$(targets_file)' as JSON: '$(err.message)'.");
-      }      
+      }
       if (targets_node.get_node_type() != Json.NodeType.ARRAY)
       {
         throw new VlsError.FAILED(@"Meson did not return an array of targets, please activate the debug logs and check the result from Meson.");
@@ -906,7 +910,7 @@ namespace Vls
       }
       source_file.content = builder.str;
 
-      request_publishDiagnostics(client);
+      request_update_context(client);
     }
 
     private void on_workspace_didChangeConfiguration(Jsonrpc.Client client, Variant @params) throws Error
@@ -915,30 +919,30 @@ namespace Vls
       update_server_config(server_config);
     }
 
-    private int publish_diagnostics_request = 0;
-    private Jsonrpc.Client publish_diagnostics_client = null;
-    private uint64 publish_diagnostics_time_us = 0;
+    private int update_context_requests = 0;
+    private Jsonrpc.Client update_context_client = null;
+    private int64 update_context_time_us = 0;
 
-    private void request_publishDiagnostics(Jsonrpc.Client client)
+    private void request_update_context(Jsonrpc.Client client)
     {
-      publish_diagnostics_client = client;
-      publish_diagnostics_request += 1;
-      int64 delay_us = int64.min(publish_diagnostics_delay_inc_us * publish_diagnostics_request, publish_diagnostics_delay_max_us);
-      publish_diagnostics_time_us = get_time_us() + delay_us;
-      if (logdebug) debug(@"Re-scheduled diagnostics in $((int) (delay_us / 1000)) ms");
+      update_context_client = client;
+      update_context_requests += 1;
+      int64 delay_us = int64.min(update_context_delay_inc_us * update_context_requests, update_context_delay_max_us);
+      update_context_time_us = get_time_us() + delay_us;
+      if (logdebug) debug(@"Context update (re-)scheduled in $((int) (delay_us / 1000)) ms");
     }
 
-    private void check_publishDiagnostics() throws Error
+    private void check_update_context() throws Error
     {
-      if (publish_diagnostics_request > 0 && get_time_us() >= publish_diagnostics_time_us)
+      if (update_context_requests > 0 && get_time_us() >= update_context_time_us)
       {
-        publish_diagnostics_request = 0;
-        publish_diagnostics_time_us = 0;
-        send_publishDiagnostics(publish_diagnostics_client);
+        update_context_requests = 0;
+        update_context_time_us = 0;
+        update_context(update_context_client);
       }
     }
 
-    private void send_publishDiagnostics(Jsonrpc.Client client) throws Error
+    private void update_context(Jsonrpc.Client client) throws Error
     {
       show_elapsed_time("Check context", () => reporter = context.check());
 
@@ -998,7 +1002,155 @@ namespace Vls
       }
     }
 
-    private void on_textDocument_definition(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private class RequestId
+    {
+      private int64? int_value;
+      private string str_value;
+
+      public RequestId(Variant id) throws Error
+      {
+        if (id.is_of_type(VariantType.INT64))
+        {
+          int_value = id.get_int64();
+        }
+        else if (id.is_of_type(VariantType.STRING))
+        {
+          str_value = id.get_string();
+        }
+        else
+        {
+          throw new VlsError.FAILED(@"Unexpected request identifier: $(id.print(true))");
+        }
+      }
+
+      public static uint hash(RequestId a)
+      {
+        if (a.int_value != null)
+        {
+          return int64_hash(a.int_value);
+        }
+        else
+        {
+          return str_hash(a.str_value);
+        }
+      }
+
+      public static bool equal(RequestId a, RequestId b)
+      {
+        if (a.int_value != null)
+        {
+          return a.int_value == b.int_value;
+        }
+        else
+        {
+          return a.str_value == b.str_value;
+        }
+      }
+
+      public string to_string()
+      {
+        if (int_value != null)
+        {
+          return int_value.to_string();
+        }
+        else
+        {
+          return str_value;
+        }
+      }
+    }
+
+    private Gee.HashSet<RequestId> pending_requests = new Gee.HashSet<RequestId>(RequestId.hash, RequestId.equal);
+
+    private void on_cancelRequest(Jsonrpc.Client client, Variant @params) throws Error
+    {
+      Variant? id = @params.lookup_value("id", null);
+      if (id == null)
+      {
+        if (logwarn) warning(@"Cannot find request identifier in 'cancel request' notification params: $(@params.print(true))");
+        return;
+      }
+
+      var request_id = new RequestId(id);
+      bool removed = pending_requests.remove(request_id);
+      if (removed)
+      {
+        if (loginfo) info(@"Request ($(request_id)): removed cancelled request from pending requests");
+      }
+      else
+      {
+        if (loginfo) info(@"Request ($(request_id)): cancelled request not found in pending requests");
+      }
+    }
+
+    private delegate void OnContextUpdatedFunc(bool request_cancelled) throws Error;
+
+    private void wait_context_update(Variant id, owned OnContextUpdatedFunc on_context_updated) throws Error
+    {
+      if (update_context_requests == 0)
+      {
+        on_context_updated(false);
+        return;
+      }
+
+      var request_id = new RequestId(id);
+      bool added = pending_requests.add(request_id);
+      if (!added)
+      {
+        if (logwarn) warning(@"Request ($(request_id)): request already in pending requests, this should not happen");
+      }
+      else
+      {
+        if (loginfo) info(@"Request ($(request_id)): added request to pending requests");
+      }
+
+      wait_context_update_aux(request_id, (owned)on_context_updated);
+    }
+
+    private void wait_context_update_aux(RequestId request_id, owned OnContextUpdatedFunc on_context_updated) throws Error
+    {
+      if (update_context_requests == 0)
+      {
+        bool removed = pending_requests.remove(request_id);
+        if (!removed)
+        {
+          if (loginfo) info(@"Request ($(request_id)): context updated but cancelled");
+          on_context_updated(true);
+        }
+        else
+        {
+          if (loginfo) info(@"Request ($(request_id)): context updated");
+          on_context_updated(false);
+        }
+      }
+      else
+      {
+        Timeout.add(wait_context_update_delay_ms, () =>
+        {
+          try
+          {
+            if (!pending_requests.contains(request_id))
+            {
+              pending_requests.remove(request_id);
+              if (loginfo) info(@"Request ($(request_id)): cancelled before context update");
+              on_context_updated(true);
+            }
+            else
+            {
+              if (loginfo) info(@"Request ($(request_id)): waiting $(wait_context_update_delay_ms) ms for context update");
+              wait_context_update_aux(request_id, (owned)on_context_updated);
+            }
+          }
+          catch (Error err)
+          {
+            error(@"Unexpected error: '$(err.message)'");
+          }
+          return false;
+        });
+      }
+    }
+
+    private void on_textDocument_definition(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
@@ -1019,7 +1171,7 @@ namespace Vls
       client.reply(id, object_to_variant(location));
     }
 
-    private void on_textDocument_hover(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_hover(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
@@ -1074,7 +1226,7 @@ namespace Vls
       return best_symbol;
     }
 
-    private void on_textDocument_completion(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_completion(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var completion_params = variant_to_object<CompletionParams>(@params);
       CompletionList? completion_list = handle_completion(completion_params);
@@ -1102,7 +1254,7 @@ namespace Vls
       return CompletionHelpers.get_completion_list(context, source_file, position);
     }
 
-    private void on_textDocument_signatureHelp(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_signatureHelp(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var position_params = variant_to_object<TextDocumentPositionParams>(@params);
       SignatureHelp? signature_help = handle_signatureHelp(position_params);
@@ -1130,7 +1282,7 @@ namespace Vls
       return CompletionHelpers.get_signature_help(context, source_file, position);
     }
 
-    private void on_textDocument_references(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_references(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var reference_params = variant_to_object<ReferenceParams>(@params);
 
@@ -1174,25 +1326,34 @@ namespace Vls
       return locations;
     }
 
-    private void on_textDocument_prepareRename(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_prepareRename(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
-      var position_params = variant_to_object<TextDocumentPositionParams>(@params);
-
-      if (context_has_errors())
+      wait_context_update(id, (request_cancelled) =>
       {
-        client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, "Cannot rename because of compilation errors", null);
-        return;
-      }
+        if (request_cancelled)
+        {
+          client.reply(id, null);
+          return;
+        }
 
-      string error_message = "Rename impossible here";
-      Range? symbol_range = handle_prepareRename(position_params, ref error_message);
-      if (symbol_range == null)
-      {
-        client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, error_message, null);
-        return;
-      }
+        var position_params = variant_to_object<TextDocumentPositionParams>(@params);
 
-      client.reply(id, object_to_variant(symbol_range));
+        if (context_has_errors())
+        {
+          client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, "Cannot rename because of compilation errors", null);
+          return;
+        }
+
+        string error_message = "Rename impossible here";
+        Range? symbol_range = handle_prepareRename(position_params, ref error_message);
+        if (symbol_range == null)
+        {
+          client.reply_error_async.begin(id, ErrorCodes.InvalidRequest, error_message, null);
+          return;
+        }
+
+        client.reply(id, object_to_variant(symbol_range));
+      });
     }
 
     private Range? handle_prepareRename(TextDocumentPositionParams position_params, ref string error_message) throws Error
@@ -1247,7 +1408,7 @@ namespace Vls
       return location.range;
     }
 
-    private void on_textDocument_rename(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_rename(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var rename_params = variant_to_object<RenameParams>(@params);
 
@@ -1316,21 +1477,30 @@ namespace Vls
       return finder.references;
     }
 
-    private void on_textDocument_documentSymbol(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_documentSymbol(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
-      var document_symbol_params = variant_to_object<DocumentSymbolParams>(@params);
-
-      JsonSerializableCollection<DocumentSymbol>? document_symbols = handle_documentSymbol(document_symbol_params);
-      if (document_symbols == null)
+      wait_context_update(id, (request_cancelled) =>
       {
-        client.reply(id, null);
-        return;
-      }
-      if (loginfo) info(@"Found $(document_symbols.size) symbol(s)");
+        if (request_cancelled)
+        {
+          client.reply(id, null);
+          return;
+        }
 
-      // Bug workaround: sink the floating reference
-      Variant result = Json.gvariant_deserialize(document_symbols.serialize(), null);
-      client.reply(id, result);
+        var document_symbol_params = variant_to_object<DocumentSymbolParams>(@params);
+
+        JsonSerializableCollection<DocumentSymbol>? document_symbols = handle_documentSymbol(document_symbol_params);
+        if (document_symbols == null)
+        {
+          client.reply(id, null);
+          return;
+        }
+        if (loginfo) info(@"Found $(document_symbols.size) symbol(s)");
+
+        // Bug workaround: sink the floating reference
+        Variant result = Json.gvariant_deserialize(document_symbols.serialize(), null);
+        client.reply(id, result);
+      });
     }
 
     private JsonSerializableCollection<DocumentSymbol>? handle_documentSymbol(DocumentSymbolParams document_symbol_params) throws Error
@@ -1346,21 +1516,30 @@ namespace Vls
       return DocumentSymbolHelpers.get_document_symbols(source_file);
     }
 
-    private void on_textDocument_codeAction(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_codeAction(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
-      var code_action_params = variant_to_object<CodeActionParams>(@params);
-
-      JsonSerializableCollection<CodeAction>? actions = handle_codeAction(code_action_params);
-      if (actions == null)
+      wait_context_update(id, (request_cancelled) =>
       {
-        client.reply(id, null);
-        return;
-      }
-      if (loginfo) info(@"Found $(actions.size) action(s)");
+        if (request_cancelled)
+        {
+          client.reply(id, null);
+          return;
+        }
 
-      // Bug workaround: sink the floating reference
-      Variant result = Json.gvariant_deserialize(actions.serialize(), null);
-      client.reply(id, result);
+        var code_action_params = variant_to_object<CodeActionParams>(@params);
+
+        JsonSerializableCollection<CodeAction>? actions = handle_codeAction(code_action_params);
+        if (actions == null)
+        {
+          client.reply(id, null);
+          return;
+        }
+        if (loginfo) info(@"Found $(actions.size) action(s)");
+
+        // Bug workaround: sink the floating reference
+        Variant result = Json.gvariant_deserialize(actions.serialize(), null);
+        client.reply(id, result);
+      });
     }
 
     private JsonSerializableCollection<CodeAction>? handle_codeAction(CodeActionParams code_action_params) throws Error
@@ -1378,27 +1557,36 @@ namespace Vls
       return check_lint.actions;
     }
 
-    private void on_textDocument_codeLens(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_textDocument_codeLens(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
-      var code_lens_params = variant_to_object<CodeLensParams>(@params);
-
       if (!references_code_lens_enabled)
       {
         client.reply(id, null);
         return;
       }
 
-      JsonSerializableCollection<CodeLens>? code_lenses = handle_codeLens(code_lens_params);
-      if (code_lenses == null)
+      wait_context_update(id, (request_cancelled) =>
       {
-        client.reply(id, null);
-        return;
-      }
-      if (loginfo) info(@"Found $(code_lenses.size) code lens(es)");
+        if (request_cancelled)
+        {
+          client.reply(id, null);
+          return;
+        }
 
-      // Bug workaround: sink the floating reference
-      Variant result = Json.gvariant_deserialize(code_lenses.serialize(), null);
-      client.reply(id, result);
+        var code_lens_params = variant_to_object<CodeLensParams>(@params);
+
+        JsonSerializableCollection<CodeLens>? code_lenses = handle_codeLens(code_lens_params);
+        if (code_lenses == null)
+        {
+          client.reply(id, null);
+          return;
+        }
+        if (loginfo) info(@"Found $(code_lenses.size) code lens(es)");
+
+        // Bug workaround: sink the floating reference
+        Variant result = Json.gvariant_deserialize(code_lenses.serialize(), null);
+        client.reply(id, result);
+      });
     }
 
     private JsonSerializableCollection<CodeLens>? handle_codeLens(CodeLensParams code_lens_params) throws Error
@@ -1445,7 +1633,7 @@ namespace Vls
       return code_lenses;
     }
 
-    private void on_codeLens_resolve(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_codeLens_resolve(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       var code_lens = variant_to_object<CodeLens>(@params);
 
@@ -1482,7 +1670,7 @@ namespace Vls
       Vala.Symbol? symbol = finder.found_symbol;
       if (symbol == null)
       {
-        if (logwarn) info(@"Could not find code lens symbol, URI: '$(uri)'");
+        if (logwarn) info(@"Could not find code lens symbol, URI: '$(uri)', start: $(range.start.line).$(range.start.character)");
         return null;
       }
 
@@ -1498,7 +1686,7 @@ namespace Vls
         };
       }
 
-      // Find the exact location of the symbol name to position the cursor      
+      // Find the exact location of the symbol name to position the cursor
       Location? location = get_symbol_location(symbol, symbol, false);
       var arguments = new JsonArrayList<string>();
       arguments.add(location.range.start.line.to_string());
@@ -1526,7 +1714,7 @@ namespace Vls
       return false;
     }
 
-    private void on_shutdown(Jsonrpc.Client client, string method, Variant id, Variant @params) throws Error
+    private void on_shutdown(Jsonrpc.Client client, Variant id, Variant @params) throws Error
     {
       context.clear();
       client.reply(id, null);
