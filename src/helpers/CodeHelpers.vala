@@ -10,7 +10,8 @@ namespace Vls
     INTERNAL,
     PROTECTED,
     PRIVATE,
-    ALL = INSTANCE | INTERNAL | PROTECTED | PRIVATE
+    ALL_STATIC = INTERNAL | PROTECTED | PRIVATE,
+    ALL = INSTANCE | INTERNAL | PROTECTED | PRIVATE,
   }
 
   /** Returns true if 'node1' is inside 'node2'. */

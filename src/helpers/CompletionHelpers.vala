@@ -305,7 +305,9 @@ namespace Vls
       Vala.Expression? completion_inner = completion_initializer.inner;
       if (completion_inner == null)
       {
-        Gee.Map<string, OrderedSymbol> global_symbols = find_global_symbols(completion_variable);
+        bool in_instance = parent_method != null && parent_method.binding == Vala.MemberBinding.INSTANCE;
+        if (loginfo) info(@"No inner expression: returning global symbols (in instance: $(in_instance))");
+        Gee.Map<string, OrderedSymbol> global_symbols = find_global_symbols(completion_variable, in_instance ? SymbolFlags.ALL : SymbolFlags.ALL_STATIC);
         if (completion_member != completion_wildcard_name)
         {
           filter_completion_symbols(global_symbols, completion_member);
@@ -393,7 +395,7 @@ namespace Vls
      * Enumerates every symbol reachable from the scope of 'node'.
      * Reachable symbols are filtered for visibility based on 'flags'.
      */
-    private static Gee.Map<string, OrderedSymbol> find_global_symbols(Vala.CodeNode node, SymbolFlags flags = SymbolFlags.ALL)
+    private static Gee.Map<string, OrderedSymbol> find_global_symbols(Vala.CodeNode node, SymbolFlags flags)
     {
       var symbols = new Gee.TreeMap<string, OrderedSymbol>();
       add_global_symbols(node, symbols, flags, 0);
