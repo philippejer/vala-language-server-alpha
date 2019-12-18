@@ -99,7 +99,7 @@ namespace Vls
   {
     if (node == null)
     {
-      return "(NULL[CodeNode])";
+      return "null (CodeNode)";
     }
     var symbol = node as Vala.Symbol;
     if (symbol != null)
@@ -108,7 +108,7 @@ namespace Vls
     }
     else
     {
-      return @"name: [not a symbol], type: '$(node.type_name)', source: '$(source_reference_to_string(node.source_reference))'";
+      return @"name: (not a symbol), type: '$(node.type_name)', source: '$(source_reference_to_string(node.source_reference))'";
     }
   }
 

@@ -21,15 +21,15 @@ namespace Vls
   }
 
 #if WINDOWS
-  public string sanitize_file_uri(string uri)
+  public string sanitize_file_uri(string fileuri)
   {
     // VS Code encodes the drive colon (known issue on Windows)
-    return Uri.unescape_string(uri);
+    return Uri.unescape_string(fileuri);
   }
 #else
-  public string sanitize_file_uri(string uri)
+  public string sanitize_file_uri(string fileuri)
   {
-    return uri;
+    return fileuri;
   }
 #endif
 

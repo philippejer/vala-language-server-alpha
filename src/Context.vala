@@ -1,20 +1,58 @@
 namespace Vls
 {
-  public class SourceFile : Object
+  public class BuildTarget
+  {
+    public string name;
+    public bool exclusive;
+    public bool active;
+    public Gee.HashMap<string, SourceFile> source_files = new Gee.HashMap<string, SourceFile>();
+
+    public BuildTarget(string name, bool exclusive, bool active)
+    {
+      this.name = name;
+      this.exclusive = exclusive;
+      this.active = active;
+    }
+
+    public void add_source_file(SourceFile source_file)
+    {
+      string key = source_file.fileuri.down();
+      source_files.set(key, source_file);
+    }
+
+    public SourceFile? get_source_file(string fileuri)
+    {
+      string key = fileuri.down();
+      SourceFile? source_file = source_files.get(key);
+      return source_file;
+    }
+
+    public Gee.Collection<SourceFile> get_source_files()
+    {
+      return source_files.values;
+    }
+
+    public void clear()
+    {
+      source_files.clear();
+    }
+  }
+
+  public class SourceFile
   {
     public string filename;
-    public string uri;
+    public string fileuri;
     /** Whether the source file has been added from an external package */
     public bool external;
     public int version;
     public string content;
-    public Vala.SourceFile file = null;
+    public Vala.SourceFile vala_file = null;
     public bool has_diagnostics = false;
 
-    public SourceFile(string filename, string uri, bool external = false, int version = 0) throws Error
+    public SourceFile(string filename, string fileuri, bool external = false, int version = 0) throws Error
     {
       this.filename = filename;
-      this.uri = uri;
+      this.fileuri = fileuri;
       this.external = external;
       this.version = version;
 
@@ -23,10 +61,10 @@ namespace Vls
       FileUtils.get_contents(filename, out content);
     }
 
-    public void set_file(Vala.SourceFile file)
+    public void set_vala_source_file(Vala.SourceFile vala_source_file)
     {
-      this.file = file;
-      file.content = content;
+      this.vala_file = vala_source_file;
+      vala_source_file.content = content;
     }
   }
 
@@ -35,31 +73,30 @@ namespace Vls
  */
   public class Context
   {
-
     public Vala.CodeContext code_context { get; private set; }
 
-    Gee.HashSet<string> defines = new Gee.HashSet<string>();
-    Gee.HashSet<string> packages = new Gee.HashSet<string>();
-    Gee.HashSet<string> vapi_directories = new Gee.HashSet<string>();
-    Gee.HashMap<string, SourceFile> source_files = new Gee.HashMap<string, SourceFile>();
+    public Gee.HashSet<string> defines = new Gee.HashSet<string>();
+    public Gee.HashSet<string> packages = new Gee.HashSet<string>();
+    public Gee.HashSet<string> vapi_directories = new Gee.HashSet<string>();
+    public Gee.HashMap<string, SourceFile> source_files = new Gee.HashMap<string, SourceFile>();
+    public Gee.HashMap<string, SourceFile> active_source_files = new Gee.HashMap<string, SourceFile>();
+    public Gee.ArrayList<BuildTarget> build_targets = new Gee.ArrayList<BuildTarget>();
+    public BuildTarget external_target = new BuildTarget("External sources", false, true);
 
-    public bool disable_warnings { get; set; default = false; }
+    public bool disable_warnings = false;
+    public bool experimental_non_null = false;
 
 #if LIBVALA_EXP
-    public bool exp_public_by_default { get; set; default = false; }
-    public bool exp_internal_by_default { get; set; default = false; }
-    public bool exp_float_by_default { get; set; default = false; }
-    public bool exp_optional_semicolons { get; set; default = false; }
-    public bool exp_optional_parens { get; set; default = false; }
-    public bool exp_conditional_attribute { get; set; default = false; }
-    public bool exp_forbid_delegate_copy { get; set; default = false; }
-    public bool exp_disable_implicit_namespace { get; set; default = false; }
-    public bool exp_integer_literal_separator { get; set; default = false; }
+    public bool exp_public_by_default = false;
+    public bool exp_internal_by_default = false;
+    public bool exp_float_by_default = false;
+    public bool exp_optional_semicolons = false;
+    public bool exp_optional_parens = false;
+    public bool exp_conditional_attribute = false;
+    public bool exp_forbid_delegate_copy = false;
+    public bool exp_disable_implicit_namespace = false;
+    public bool exp_integer_literal_separator = false;
 #endif
-
-    public Context()
-    {
-    }
 
     public void add_define(string define)
     {
@@ -78,23 +115,82 @@ namespace Vls
 
     public void add_source_file(SourceFile source_file)
     {
-      string key = source_file.uri.down();
-      source_files[key] = source_file;
+      string key = source_file.fileuri.down();
+      source_files.set(key, source_file);
     }
 
-    public SourceFile? get_source_file(string uri)
+    public SourceFile? get_source_file(string fileuri)
     {
-      string key = uri.down();
-      if (!source_files.has_key(key))
+      string key = fileuri.down();
+      SourceFile? source_file = source_files.get(key);
+      return source_file;
+    }
+
+    public bool has_active_source_file(SourceFile source_file)
+    {
+      string key = source_file.fileuri.down();
+      return active_source_files.has_key(key);
+    }
+
+    public void add_active_source_file(SourceFile source_file)
+    {
+      string key = source_file.fileuri.down();
+      active_source_files.set(key, source_file);
+    }
+
+    public SourceFile? get_active_source_file(string fileuri)
+    {
+      string key = fileuri.down();
+      SourceFile? source_file = active_source_files.get(key);
+      return source_file;
+    }
+
+    public Gee.Collection<SourceFile> get_active_source_files()
+    {
+      return active_source_files.values;
+    }
+
+    public void add_build_target(BuildTarget build_target)
+    {
+      build_targets.add(build_target);
+    }
+
+    public BuildTarget? get_build_target_for_source_file(string fileuri)
+    {
+      string key = fileuri.down();
+
+      foreach (BuildTarget build_target in build_targets)
       {
-        return null;
+        if (build_target.source_files.has_key(key))
+        {
+          return build_target;
+        }
       }
-      return source_files[key];
+
+      if (external_target.source_files.has_key(key))
+      {
+        return external_target;
+      }
+
+      return null;
     }
 
-    public Gee.Collection<SourceFile> get_source_files()
+    public void activate_build_target(BuildTarget build_target)
     {
-      return source_files.values;
+      if (build_target.exclusive)
+      {
+        foreach (BuildTarget other_target in build_targets)
+        {
+          if (other_target != build_target && other_target.exclusive && other_target.active)
+          {
+            if (loginfo) info(@"Deactivate target '$(other_target.name)'");
+            other_target.active = false;
+          }
+        }
+      }
+
+      if (loginfo) info(@"Activate target '$(build_target.name)'");
+      build_target.active = true;
     }
 
     public void clear()
@@ -108,6 +204,9 @@ namespace Vls
       packages.clear();
       vapi_directories.clear();
       source_files.clear();
+      active_source_files.clear();
+      build_targets.clear();
+      external_target.clear();
     }
 
     public Reporter check() throws Error
@@ -149,7 +248,9 @@ namespace Vls
     {
       reporter.enable_warnings = !disable_warnings;
       code_context.report = reporter;
-      
+
+      code_context.experimental_non_null = experimental_non_null;
+
 #if LIBVALA_EXP
       code_context.exp_public_by_default = exp_public_by_default;
       code_context.exp_internal_by_default = exp_internal_by_default;
@@ -185,32 +286,51 @@ namespace Vls
         code_context.add_external_package(package);
       }
 
-      foreach (SourceFile source_file in source_files.values)
+      active_source_files.clear();
+
+      // Add source files from currently active targets to the compiler context
+      foreach (BuildTarget build_target in build_targets)
       {
-        // Source files which come from external packages do not need to be added explicitly
-        if (!source_file.external)
+        if (!build_target.active)
         {
-          code_context.add_source_filename(source_file.filename);
+          continue;
+        }
+
+        foreach (SourceFile source_file in build_target.get_source_files())
+        {
+          // The source file may have already been added if it is part of several targets
+          if (!has_active_source_file(source_file))
+          {
+            code_context.add_source_filename(source_file.filename);
+            add_active_source_file(source_file);
+          }
         }
       }
 
-      Vala.List<Vala.SourceFile> files = code_context.get_source_files();
-      foreach (Vala.SourceFile file in files)
+      // Associate each active source file with the corresponding Vala object
+      // Also add source files which have been added implicitly to the context (VAPI files from packages)
+      foreach (Vala.SourceFile vala_source_file in code_context.get_source_files())
       {
-        unowned string filename = file.filename;
-        string uri = sanitize_file_uri(Filename.to_uri(filename));
+        unowned string filename = vala_source_file.filename;
+        string fileuri = sanitize_file_uri(Filename.to_uri(filename));
 
-        SourceFile source_file = get_source_file(uri);
+        SourceFile source_file = get_source_file(fileuri);
 
         if (source_file == null)
         {
-          // This source file does not come from the build file, which means it comes from an external package
-          if (loginfo) info(@"Adding source file '$(filename)' from packages");
-          source_file = new SourceFile(filename, uri, true);
+          // This file does not come from the build targets, which means it comes from an external package
+          if (loginfo) info(@"Adding external source file '$(filename)' from packages");
+          source_file = new SourceFile(filename, fileuri, true);
           add_source_file(source_file);
+          external_target.add_source_file(source_file);
         }
 
-        source_file.set_file(file);
+        if (source_file.external)
+        {
+          add_active_source_file(source_file);
+        }
+
+        source_file.set_vala_source_file(vala_source_file);
       }
     }
   }

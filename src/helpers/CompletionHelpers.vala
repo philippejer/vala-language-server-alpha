@@ -269,7 +269,7 @@ namespace Vls
     private static Gee.Map<string, OrderedSymbol>? compute_completion_symbols(SourceFile source_file, out string completion_member)
     {
       completion_member = null;
-      Vala.Symbol? completion_symbol = find_completion_symbol(source_file.file, completion_symbol_name);
+      Vala.Symbol? completion_symbol = find_completion_symbol(source_file.vala_file, completion_symbol_name);
       if (completion_symbol == null)
       {
         return null;
@@ -497,7 +497,7 @@ namespace Vls
     {
       if (node == null)
       {
-        return "(NULL[CodeNode])";
+        return "null (CodeNode)";
       }
       var symbol = node as Vala.Symbol;
       if (symbol != null)
@@ -506,7 +506,7 @@ namespace Vls
       }
       else
       {
-        return @"name: [not a symbol]', type: '$(node.type_name)', source: '$(source_reference_to_string(node.source_reference))'";
+        return @"name: (not a symbol)', type: '$(node.type_name)', source: '$(source_reference_to_string(node.source_reference))'";
       }
     }
 

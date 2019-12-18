@@ -1,118 +1,5 @@
 namespace Vls
 {
-  public errordomain VlsError
-  {
-    FAILED
-  }
-
-  public enum LogLevel
-  {
-    OFF = 0,
-    WARN,
-    INFO,
-    DEBUG,
-    SILLY;
-
-    public string to_string()
-    {
-      return ((GLib.EnumClass) typeof(LogLevel).class_ref()).get_value(this).value_name.replace("VLS_LOG_LEVEL_", "");
-    }
-
-    public string to_json()
-    {
-      switch (this)
-      {
-      case LogLevel.OFF: return "off";
-      case LogLevel.WARN: return "warn";
-      case LogLevel.INFO: return "info";
-      case LogLevel.DEBUG: return "debug";
-      case LogLevel.SILLY: return "silly";
-      default: return "???";
-      }
-    }
-
-    public static LogLevel from_json(string? value)
-    {
-      switch (value)
-      {
-      case "off": return LogLevel.OFF;
-      case "warn": return LogLevel.WARN;
-      case "info": return LogLevel.INFO;
-      case "debug": return LogLevel.DEBUG;
-      case "silly": return LogLevel.SILLY;
-      case "true": return LogLevel.INFO;
-      default: return LogLevel.INFO;
-      }
-    }
-  }
-
-  public enum MethodCompletionMode
-  {
-    OFF = 0,
-    SPACE,
-    NOSPACE;
-
-    public string to_string()
-    {
-      return ((GLib.EnumClass) typeof(MethodCompletionMode).class_ref()).get_value(this).value_name.replace("VLS_METHOD_COMPLETION_MODE_", "");
-    }
-
-    public string to_json()
-    {
-      switch (this)
-      {
-      case MethodCompletionMode.OFF: return "off";
-      case MethodCompletionMode.SPACE: return "space";
-      case MethodCompletionMode.NOSPACE: return "nospace";
-      default: return "???";
-      }
-    }
-
-    public static MethodCompletionMode from_json(string? value)
-    {
-      switch (value)
-      {
-      case "off": return MethodCompletionMode.OFF;
-      case "space": return MethodCompletionMode.SPACE;
-      case "nospace": return MethodCompletionMode.NOSPACE;
-      default: return MethodCompletionMode.OFF;
-      }
-    }
-  }
-
-  public class ServerConfig : AbstractJsonSerializableObject
-  {
-    public LogLevel logLevel { get; set; default = LogLevel.WARN; }
-    public MethodCompletionMode methodCompletionMode { get; set; default = MethodCompletionMode.OFF; }
-    public bool referencesCodeLensEnabled { get; set; default = false; }
-
-    public override Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
-    {
-      error("Not supported");
-    }
-
-    public override bool deserialize_property(string property_name, ref Value @value, ParamSpec pspec, Json.Node property_node)
-    {
-      if (pspec.value_type.is_a(typeof(LogLevel)))
-      {
-        LogLevel level = property_node.get_node_type() == Json.NodeType.VALUE
-          ? LogLevel.from_json(property_node.get_string())
-          : LogLevel.WARN;
-        @value.set_enum(level);
-        return true;
-      }
-      else if (pspec.value_type.is_a(typeof(MethodCompletionMode)))
-      {
-        MethodCompletionMode mode = property_node.get_node_type() == Json.NodeType.VALUE
-          ? MethodCompletionMode.from_json(property_node.get_string())
-          : MethodCompletionMode.OFF;
-        @value.set_enum(mode);
-        return true;
-      }
-      return base.deserialize_property(property_name, ref @value, pspec, property_node);
-    }
-  }
-
   public LogLevel loglevel = LogLevel.OFF;
   public bool logsilly = false;
   public bool logdebug = false;
@@ -130,131 +17,6 @@ namespace Vls
     logwarn = (loglevel >= LogLevel.WARN);
     method_completion_mode = config.methodCompletionMode;
     references_code_lens_enabled = config.referencesCodeLensEnabled;
-  }
-
-  public class BuildConfig : AbstractJsonSerializableObject
-  {
-    public JsonSerializableCollection<string> sources { get; set; }
-
-    public string parameters { get; set; }
-
-    protected override JsonSerializableCollection? create_collection(string property_name)
-    {
-      switch (property_name)
-      {
-      case "sources":
-        return new JsonArrayList<string>();
-      }
-      return base.create_collection(property_name);
-    }
-  }
-
-  public class MesonTarget : AbstractJsonSerializableObject, JsonSerializableObject
-  {
-    public string name { get; set; }
-
-    public string type_ { get; set; } // "type" is not allowed even with an '@'
-
-    public JsonSerializableCollection<MesonTargetSource> target_sources { get; set; }
-
-    public override unowned ParamSpec? find_property(string name)
-    {
-      return base.find_property(name == "type" ? "type_" : name);
-    }
-
-    protected override JsonSerializableCollection? create_collection(string property_name)
-    {
-      switch (property_name)
-      {
-      case "target-sources":
-        return new JsonArrayList<MesonTargetSource>();
-      }
-      return base.create_collection(property_name);
-    }
-  }
-
-  public class MesonTargetSource : AbstractJsonSerializableObject
-  {
-    public string language { get; set; }
-
-    public JsonSerializableCollection<string> parameters { get; set; }
-
-    public JsonSerializableCollection<string> sources { get; set; }
-
-    protected override JsonSerializableCollection? create_collection(string property_name)
-    {
-      switch (property_name)
-      {
-      case "parameters":
-      case "sources":
-        return new JsonArrayList<string>();
-      }
-      return base.create_collection(property_name);
-    }
-  }
-
-  public enum LintSeverity
-  {
-    IGNORE = 0,
-    HINT,
-    INFO,
-    WARN,
-    ERROR;
-
-    public string to_string()
-    {
-      return ((GLib.EnumClass) typeof(LintSeverity).class_ref()).get_value(this).value_name.replace("LINT_SEVERITY_", "");
-    }
-
-    public string to_json()
-    {
-      switch (this)
-      {
-      case LintSeverity.IGNORE: return "ignore";
-      case LintSeverity.HINT: return "hint";
-      case LintSeverity.INFO: return "info";
-      case LintSeverity.WARN: return "warn";
-      case LintSeverity.ERROR: return "error";
-      default: return "???";
-      }
-    }
-
-    public static LintSeverity from_json(string? value)
-    {
-      switch (value)
-      {
-      case "ignore": return LintSeverity.IGNORE;
-      case "hint": return LintSeverity.HINT;
-      case "info": return LintSeverity.INFO;
-      case "warn": return LintSeverity.WARN;
-      case "error": return LintSeverity.ERROR;
-      default: return LintSeverity.IGNORE;
-      }
-    }
-  }
-
-  public class LintConfig : AbstractJsonSerializableObject
-  {
-    public LintSeverity no_implicit_this_access { get; set; default = LintSeverity.IGNORE; }
-    public LintSeverity no_unqualified_static_access { get; set; default = LintSeverity.IGNORE; }
-
-    public override Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
-    {
-      error("Not supported");
-    }
-
-    public override bool deserialize_property(string property_name, ref Value @value, ParamSpec pspec, Json.Node property_node)
-    {
-      if (pspec.value_type.is_a(typeof(LintSeverity)))
-      {
-        LintSeverity severity = property_node.get_node_type() == Json.NodeType.VALUE
-          ? LintSeverity.from_json(property_node.get_string())
-          : LintSeverity.IGNORE;
-        @value.set_enum(severity);
-        return true;
-      }
-      return base.deserialize_property(property_name, ref @value, pspec, property_node);
-    }
   }
 
   public class Server
@@ -325,6 +87,9 @@ namespace Vls
             break;
           case "textDocument/didOpen":
             on_textDocument_didOpen(client, @params);
+            break;
+          case "textDocument/didClose":
+            on_textDocument_didClose(client, @params);
             break;
           case "textDocument/didChange":
             on_textDocument_didChange(client, @params);
@@ -504,6 +269,7 @@ namespace Vls
       {
         textDocumentSync = new TextDocumentSyncOptions()
         {
+          openClose = true,
           change = TextDocumentSyncKind.Incremental
         },
         definitionProvider = true,
@@ -537,7 +303,8 @@ namespace Vls
       };
       client.reply(id, object_to_variant(result));
 
-      update_context(client);
+      update_context_client = client;
+      update_context();
     }
 
     private void monitor_file(string file, bool when_stable, owned ActionFunc action)
@@ -628,9 +395,12 @@ namespace Vls
         throw new VlsError.FAILED(@"Build file '$(build_file)' should contain a 'parameters' element (string), this is probably not right.");
       }
 
+      var build_target = new BuildTarget("Sources", false, true);
+      context.add_build_target(build_target);
+
       foreach (string source in config.sources)
       {
-        add_source_path(root_path, source);
+        add_source_path(build_target, root_path, source);
       }
 
       parse_compiler_parameters(config.parameters.replace("\"", ""));
@@ -663,29 +433,37 @@ namespace Vls
       }
 
       bool has_executable_target = false;
+
       foreach (MesonTarget target in targets)
       {
-        if (loginfo) info(@"Meson target: '$(target.name)' ($(target.type_))");
-
-        if (target.type_ != "executable" && !target.type_.has_suffix("library"))
+        if (target.target_type != "executable" && !target.target_type.has_suffix("library"))
         {
-          if (loginfo) info(@"Target is not an executable target and will be ignored");
+          if (loginfo) info(@"Target '$(target.name)' ($(target.target_type)) is not a source target and will be ignored");
           continue;
         }
 
-        if (target.type_ == "executable")
+        if (loginfo) info(@"Found target: '$(target.name)' ($(target.target_type))");
+
+        bool is_executable_target = target.target_type == "executable";
+        var build_target = new BuildTarget(target.name, is_executable_target, true);
+        context.add_build_target(build_target);
+
+        if (is_executable_target)
         {
           if (has_executable_target)
           {
-            if (logwarn) warning(@"Multiple executable targets found in Meson build file, additional executable target will be ignored: '$(target.name)' ($(target.type_)) ignored");
-            continue;
+            if (loginfo) info(@"Additional executable target '$(target.name)' found in Meson build file, only the first executable target can be active at any time");
+            build_target.active = false;
           }
-          has_executable_target = true;
+          else
+          {
+            has_executable_target = true;
+          }
         }
 
         if (target.target_sources == null)
         {
-          throw new VlsError.FAILED(@"Missing sources in Meson target '$(target.name)' ($(target.type_)), please activate the debug logs to check the result from Meson.");
+          throw new VlsError.FAILED(@"No sources in Meson target '$(target.name)' ($(target.target_type)), check targets file '$(targets_file)'.");
         }
 
         foreach (MesonTargetSource target_source in target.target_sources)
@@ -706,14 +484,14 @@ namespace Vls
           {
             foreach (string source in target_source.sources)
             {
-              add_source_path(root_path, source);
+              add_source_path(build_target, root_path, source);
             }
           }
         }
       }
     }
 
-    private void add_source_path(string root_path, string filepath) throws Error
+    private void add_source_path(BuildTarget build_target, string root_path, string filepath) throws Error
     {
       filepath = Path.is_absolute(filepath) ? filepath : Path.build_filename(root_path, filepath);
 
@@ -724,15 +502,24 @@ namespace Vls
         for (string name = dir.read_name(); name != null; name = dir.read_name())
         {
           string filename = Path.build_filename(filepath, name);
-          add_source_path(root_path, filename);
+          add_source_path(build_target, root_path, filename);
         }
       }
       else if (is_source_file(filepath))
       {
-        string uri = sanitize_file_uri(Filename.to_uri(filepath));
-        if (loginfo) info(@"Found source file '$(filepath)' -> '$(uri)'");
-        var source_file = new SourceFile(filepath, uri);
-        context.add_source_file(source_file);
+        string fileuri = sanitize_file_uri(Filename.to_uri(filepath));
+        SourceFile? source_file = context.get_source_file(fileuri);
+        if (source_file == null)
+        {
+          if (loginfo) info(@"Target '$(build_target.name)': found source file '$(filepath)'");
+          source_file = new SourceFile(filepath, fileuri);
+          context.add_source_file(source_file);
+        }
+        else
+        {
+          if (loginfo) info(@"Target '$(build_target.name)': found source file '$(filepath)' (already added for another target)");
+        }
+        build_target.add_source_file(source_file);
       }
     }
 
@@ -779,6 +566,12 @@ namespace Vls
       {
         if (loginfo) info("Found '--disable-warnings' flag");
         context.disable_warnings = true;
+      }
+
+      if (/--enable-experimental-non-null/.match(parameters, (GLib.RegexMatchFlags) 0, out match_info))
+      {
+        if (loginfo) info("Found '--enable-experimental-non-null' flag");
+        context.experimental_non_null = true;
       }
 
 #if LIBVALA_EXP
@@ -858,33 +651,38 @@ namespace Vls
     {
       var document = @params.lookup_value("textDocument", VariantType.VARDICT);
 
-      string uri = sanitize_file_uri((string)document.lookup_value("uri", VariantType.STRING));
+      string fileuri = sanitize_file_uri((string)document.lookup_value("uri", VariantType.STRING));
       string language = (string)document.lookup_value("languageId", VariantType.STRING);
 
-      if (loginfo) info(@"Document opened, uri ($(uri)), language ($(language))");
+      if (loginfo) info(@"Document opened, fileuri ($(fileuri)), language ($(language))");
+    }
 
-      if (language != "vala" && language != "genie")
-      {
-        throw new VlsError.FAILED(@"Unsupported language '$(language)' sent to Vala Language Server.");
-      }
+    private void on_textDocument_didClose(Jsonrpc.Client client, Variant @params) throws Error
+    {
+      var document = @params.lookup_value("textDocument", VariantType.VARDICT);
+
+      string fileuri = sanitize_file_uri((string)document.lookup_value("uri", VariantType.STRING));
+      string language = (string)document.lookup_value("languageId", VariantType.STRING);
+
+      if (loginfo) info(@"Document closed, fileuri ($(fileuri)), language ($(language))");
     }
 
     private void on_textDocument_didChange(Jsonrpc.Client client, Variant @params) throws Error
     {
       var change_params = variant_to_object<DidChangeTextDocumentParams>(@params);
-      string uri = sanitize_file_uri(change_params.textDocument.uri);
+      string fileuri = sanitize_file_uri(change_params.textDocument.uri);
       int version = change_params.textDocument.version;
 
-      if (loginfo) info(@"Document changed, URI: '$(uri)', version: $(version)");
+      if (loginfo) info(@"Document changed, fileuri: '$(fileuri)', version: $(version)");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return;
 
       if (source_file.version > version)
       {
         // Seems to cause issues more than anything...
-        //  throw new VlsError.FAILED(@"Rejecting outdated version for URI '$(uri)'");
-        if (logwarn) warning(@"Received outdated version $(version) vs. file version $(source_file.version) for URI '$(uri)'");
+        //  throw new VlsError.FAILED(@"Rejecting outdated version for file URI '$(fileuri)'");
+        if (logwarn) warning(@"Received outdated version $(version) vs. file version $(source_file.version) for file URI '$(fileuri)'");
       }
       source_file.version = version;
 
@@ -894,7 +692,7 @@ namespace Vls
       {
         if (change.range == null)
         {
-          if (loginfo) info(@"Full text change, filename: '$(source_file.filename)', text: '$(change.text.replace("\r", ""))'");
+          if (loginfo) info(@"Full text change, filename: '$(source_file.filename)'");
           builder.assign(change.text);
         }
         else
@@ -938,20 +736,21 @@ namespace Vls
       {
         update_context_requests = 0;
         update_context_time_us = 0;
-        update_context(update_context_client);
+        update_context();
       }
     }
 
-    private void update_context(Jsonrpc.Client client) throws Error
+    private void update_context() throws Error
     {
       show_elapsed_time("Check context", () => reporter = context.check());
 
-      Gee.Collection<SourceFile> source_files = context.get_source_files();
-      foreach (SourceFile source_file in source_files)
+      if (update_context_client == null) return;
+
+      foreach (SourceFile source_file in context.get_active_source_files())
       {
         var diagnostics = new JsonArrayList<Diagnostic>();
 
-        var errors = reporter.errors_by_file[source_file.file.filename];
+        var errors = reporter.errors_by_file[source_file.filename];
         if (errors != null)
         {
           foreach (SourceError error in errors)
@@ -961,7 +760,7 @@ namespace Vls
           }
         }
 
-        var warnings = reporter.warnings_by_file[source_file.file.filename];
+        var warnings = reporter.warnings_by_file[source_file.filename];
         if (warnings != null)
         {
           foreach (SourceError error in warnings)
@@ -971,7 +770,7 @@ namespace Vls
           }
         }
 
-        var notes = reporter.notes_by_file[source_file.file.filename];
+        var notes = reporter.notes_by_file[source_file.filename];
         if (notes != null)
         {
           foreach (SourceError error in notes)
@@ -981,23 +780,26 @@ namespace Vls
           }
         }
 
-        var check_lint = new CheckLintInFile(source_file.file, lint_config);
+        var check_lint = new CheckLintInFile(source_file.vala_file, lint_config);
         check_lint.find();
         diagnostics.add_all(check_lint.diagnostics);
 
         bool has_diagnostics = !diagnostics.is_empty;
         bool had_diagnostics = source_file.has_diagnostics;
         source_file.has_diagnostics = has_diagnostics;
+
         // Republish if there are diagnostics for this file or to clear previous diagnostics
         if (has_diagnostics || had_diagnostics)
         {
           if (loginfo) info(@"Sending diagnostics for source file '$(source_file.filename)'");
+
           var @params = new PublishDiagnosticsParams()
           {
-            uri = source_file.uri,
+            uri = source_file.fileuri,
             diagnostics = diagnostics
           };
-          client.send_notification("textDocument/publishDiagnostics", object_to_variant(@params));
+
+          update_context_client.send_notification("textDocument/publishDiagnostics", object_to_variant(@params));
         }
       }
     }
@@ -1202,19 +1004,17 @@ namespace Vls
 
     private Vala.Symbol? find_symbol_reference_at_position(TextDocumentIdentifier textDocument, Position position, bool prefer_override = false) throws Error
     {
-      string uri = sanitize_file_uri(textDocument.uri);
-      if (loginfo) info(@"Searching symbol, URI: '$(uri)', position: $(position.line).$(position.character)");
+      string fileuri = sanitize_file_uri(textDocument.uri);
+      if (loginfo) info(@"Searching symbol, fileuri: '$(fileuri)', position: $(position.line).$(position.character)");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
-      Vala.SourceFile file = source_file.file;
-
-      var finder = new FindSymbolReferenceAtPosition(file, position.line + 1, position.character + 1, prefer_override);
+      var finder = new FindSymbolReferenceAtPosition(source_file.vala_file, position.line + 1, position.character + 1, prefer_override);
       finder.find();
       if (finder.symbols.is_empty)
       {
-        if (loginfo) info(@"Cannot find symbol, filename: '$(file.filename)', position: $(position.line).$(position.character)");
+        if (loginfo) info(@"Cannot find symbol, filename: '$(source_file.filename)', position: $(position.line).$(position.character)");
         return null;
       }
       if (loginfo) info(@"Found $(finder.symbols.size) symbol(s)");
@@ -1243,12 +1043,12 @@ namespace Vls
     private CompletionList? handle_completion(CompletionParams completion_params) throws Error
     {
       unowned TextDocumentIdentifier textDocument = completion_params.textDocument;
-      string uri = sanitize_file_uri(textDocument.uri);
+      string fileuri = sanitize_file_uri(textDocument.uri);
       unowned Position position = completion_params.position;
 
-      if (loginfo) info(@"Attempting completion, URI: '$(uri)', position: $(position.line).$(position.character)");
+      if (loginfo) info(@"Attempting completion, fileuri: '$(fileuri)', position: $(position.line).$(position.character)");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
       return CompletionHelpers.get_completion_list(context, source_file, position);
@@ -1271,12 +1071,12 @@ namespace Vls
     private SignatureHelp? handle_signatureHelp(TextDocumentPositionParams position_params) throws Error
     {
       unowned TextDocumentIdentifier textDocument = position_params.textDocument;
-      string uri = sanitize_file_uri(textDocument.uri);
+      string fileuri = sanitize_file_uri(textDocument.uri);
       unowned Position position = position_params.position;
 
-      if (loginfo) info(@"Attempting signature help, URI: '$(uri)', position: $(position.line).$(position.character)");
+      if (loginfo) info(@"Attempting signature help, fileuri: '$(fileuri)', position: $(position.line).$(position.character)");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
       return CompletionHelpers.get_signature_help(context, source_file, position);
@@ -1507,10 +1307,10 @@ namespace Vls
     {
       TextDocumentIdentifier textDocument = document_symbol_params.textDocument;
 
-      string uri = sanitize_file_uri(textDocument.uri);
-      if (loginfo) info(@"Searching symbols, URI: '$(uri)'");
+      string fileuri = sanitize_file_uri(textDocument.uri);
+      if (loginfo) info(@"Searching symbols, fileuri: '$(fileuri)'");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
       return DocumentSymbolHelpers.get_document_symbols(source_file);
@@ -1546,13 +1346,13 @@ namespace Vls
     {
       TextDocumentIdentifier textDocument = code_action_params.textDocument;
 
-      string uri = sanitize_file_uri(textDocument.uri);
-      if (loginfo) info(@"Searching symbols, URI: '$(uri)'");
+      string fileuri = sanitize_file_uri(textDocument.uri);
+      if (loginfo) info(@"Searching symbols, fileuri: '$(fileuri)'");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
-      var check_lint = new CheckLintInFile(source_file.file, lint_config, code_action_params.range);
+      var check_lint = new CheckLintInFile(source_file.vala_file, lint_config, code_action_params.range);
       check_lint.find();
       return check_lint.actions;
     }
@@ -1593,8 +1393,8 @@ namespace Vls
     {
       unowned TextDocumentIdentifier textDocument = code_lens_params.textDocument;
 
-      string uri = sanitize_file_uri(textDocument.uri);
-      if (loginfo) info(@"Searching code lens symbols, URI: '$(uri)'");
+      string fileuri = sanitize_file_uri(textDocument.uri);
+      if (loginfo) info(@"Searching code lens symbols, fileuri: '$(fileuri)'");
 
       if (context_has_errors())
       {
@@ -1602,16 +1402,16 @@ namespace Vls
         return null;
       }
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
-      if (is_package_file(source_file.file.filename))
+      if (is_package_file(source_file.filename))
       {
-        if (loginfo) info(@"No code lens for package file, URI: '$(uri)'");
+        if (loginfo) info(@"No code lens for package file, fileuri: '$(fileuri)'");
         return null;
       }
 
-      var finder = new FindCodeLensSymbolsInFile(source_file.file);
+      var finder = new FindCodeLensSymbolsInFile(source_file.vala_file);
       finder.find();
 
       var code_lenses = new JsonArrayList<CodeLens>();
@@ -1638,6 +1438,7 @@ namespace Vls
       var code_lens = variant_to_object<CodeLens>(@params);
 
       Command? code_lens_command = handle_codeLens_resolve(code_lens);
+
       if (code_lens_command == null)
       {
         // Not answering or answering with an error will display an even uglier !!MISSING: command!! message
@@ -1658,19 +1459,19 @@ namespace Vls
       unowned TextDocumentIdentifier textDocument = code_lens.data.textDocument;
       unowned Range range = code_lens.range;
 
-      string uri = sanitize_file_uri(textDocument.uri);
-      if (loginfo) info(@"Resolving code lens, URI: '$(uri)', start: $(range.start.line).$(range.start.character)");
+      string fileuri = sanitize_file_uri(textDocument.uri);
+      if (loginfo) info(@"Resolving code lens, fileuri: '$(fileuri)', start: $(range.start.line).$(range.start.character)");
 
-      SourceFile? source_file = get_source_file(uri);
+      SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
-      var finder = new FindCodeLensSymbolInFile(source_file.file, code_lens.range.start.line + 1, code_lens.range.start.character + 1);
+      var finder = new FindCodeLensSymbolInFile(source_file.vala_file, code_lens.range.start.line + 1, code_lens.range.start.character + 1);
       finder.find();
 
       Vala.Symbol? symbol = finder.found_symbol;
       if (symbol == null)
       {
-        if (logwarn) info(@"Could not find code lens symbol, URI: '$(uri)', start: $(range.start.line).$(range.start.character)");
+        if (logwarn) info(@"Could not find code lens symbol, fileuri: '$(fileuri)', start: $(range.start.line).$(range.start.character)");
         return null;
       }
 
@@ -1759,25 +1560,36 @@ namespace Vls
       return filename.has_suffix(".vapi") || filename.has_suffix(".gir");
     }
 
-    private SourceFile? get_source_file(string uri) throws Error
+    private SourceFile? get_source_file(string fileuri) throws Error
     {
-      if (!uri.has_prefix("file:"))
+      if (!fileuri.has_prefix("file:"))
       {
         return null;
       }
 
-      SourceFile? source_file = context.get_source_file(uri);
+      SourceFile? source_file = context.get_active_source_file(fileuri);
+
       if (source_file == null)
       {
-        if (loginfo)
+        // The source file is not part of an active build target, try to find an inactive build target
+        BuildTarget? build_target = context.get_build_target_for_source_file(fileuri);
+
+        if (build_target == null)
         {
-          info(@"Source file '$(uri)' is not part of the current analysis context.");
-          info(@"If this file is supposed to belong to the current project, check that the build file has been found and analyzed correctly.");
+          if (loginfo)
+          {
+            info(@"Source file '$(fileuri)' is not part of the active build context.");
+            info(@"If this file is supposed to belong to the current project, enable the debug logs to check that the build file is correctly processed.");
+          }
+          return null;
         }
-        return null;
+
+        context.activate_build_target(build_target);
+
+        update_context();
       }
 
-      return source_file;
+      return context.get_active_source_file(fileuri);
     }
   }
 }

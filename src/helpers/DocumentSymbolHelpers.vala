@@ -180,7 +180,7 @@ namespace Vls
 
     public static Gee.Set<Vala.Symbol> find_symbols_in_file(SourceFile source_file)
     {
-      var finder = new FindSymbolsInFile(source_file.file);
+      var finder = new FindSymbolsInFile(source_file.vala_file);
       finder.find();
       return finder.symbols;
     }
