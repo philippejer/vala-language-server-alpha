@@ -799,7 +799,9 @@ namespace Vls
             diagnostics = diagnostics
           };
 
-          update_context_client.send_notification("textDocument/publishDiagnostics", object_to_variant(@params));
+          // Important: do not use the synchronous version, otherwise the thread will start processing
+          // other requests (completion...) which causes nasty race conditions
+          update_context_client.send_notification_async.begin("textDocument/publishDiagnostics", object_to_variant(@params), null);
         }
       }
     }
