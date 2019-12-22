@@ -301,7 +301,7 @@ namespace Vls
       {
         capabilities = capabilities
       };
-      client.reply(id, object_to_variant(result));
+      client.reply_async.begin(id, object_to_variant(result), null);
 
       update_context_client = client;
       update_context();
@@ -972,7 +972,7 @@ namespace Vls
         return;
       }
 
-      client.reply(id, object_to_variant(location));
+      client.reply_async.begin(id, object_to_variant(location), null);
     }
 
     private void on_textDocument_hover(Jsonrpc.Client client, Variant id, Variant @params) throws Error
@@ -996,7 +996,7 @@ namespace Vls
         value = @"```vala\n$(definition_code)\n```"
       };
 
-      client.reply(id, object_to_variant(hover));
+      client.reply_async.begin(id, object_to_variant(hover), null);
     }
 
     private Vala.Symbol? find_symbol_definition_at_position(TextDocumentIdentifier textDocument, Position position) throws Error
@@ -1039,7 +1039,7 @@ namespace Vls
         return;
       }
 
-      client.reply(id, object_to_variant(completion_list));
+      client.reply_async.begin(id, object_to_variant(completion_list), null);
     }
 
     private CompletionList? handle_completion(CompletionParams completion_params) throws Error
@@ -1067,7 +1067,7 @@ namespace Vls
         return;
       }
 
-      client.reply(id, object_to_variant(signature_help));
+      client.reply_async.begin(id, object_to_variant(signature_help), null);
     }
 
     private SignatureHelp? handle_signatureHelp(TextDocumentPositionParams position_params) throws Error
@@ -1098,7 +1098,7 @@ namespace Vls
 
       // Bug workaround: sink the floating reference
       Variant result = Json.gvariant_deserialize(locations.serialize(), null);
-      client.reply(id, result);
+      client.reply_async.begin(id, result, null);
     }
 
     private JsonArrayList<Location>? handle_references(ReferenceParams reference_params) throws Error
@@ -1154,7 +1154,7 @@ namespace Vls
           return;
         }
 
-        client.reply(id, object_to_variant(symbol_range));
+        client.reply_async.begin(id, object_to_variant(symbol_range), null);
       });
     }
 
@@ -1223,7 +1223,7 @@ namespace Vls
       }
       if (loginfo) info(@"Found $(workspace_edit.changes.size) edit(s)");
 
-      client.reply(id, object_to_variant(workspace_edit));
+      client.reply_async.begin(id, object_to_variant(workspace_edit), null);
     }
 
     private WorkspaceEdit? handle_rename(RenameParams rename_params, ref string error_message) throws Error
@@ -1301,7 +1301,7 @@ namespace Vls
 
         // Bug workaround: sink the floating reference
         Variant result = Json.gvariant_deserialize(document_symbols.serialize(), null);
-        client.reply(id, result);
+        client.reply_async.begin(id, result, null);
       });
     }
 
@@ -1340,7 +1340,7 @@ namespace Vls
 
         // Bug workaround: sink the floating reference
         Variant result = Json.gvariant_deserialize(actions.serialize(), null);
-        client.reply(id, result);
+        client.reply_async.begin(id, result, null);
       });
     }
 
@@ -1387,7 +1387,7 @@ namespace Vls
 
         // Bug workaround: sink the floating reference
         Variant result = Json.gvariant_deserialize(code_lenses.serialize(), null);
-        client.reply(id, result);
+        client.reply_async.begin(id, result, null);
       });
     }
 
@@ -1453,7 +1453,7 @@ namespace Vls
       }
 
       code_lens.command = code_lens_command;
-      client.reply(id, object_to_variant(code_lens));
+      client.reply_async.begin(id, object_to_variant(code_lens), null);
     }
 
     private Command? handle_codeLens_resolve(CodeLens code_lens) throws Error
