@@ -8,6 +8,8 @@ common_sources = files([
 	'src/ServerTypes.vala',
 	'src/Reporter.vala',
 	'src/Context.vala',
+	'src/visitors/CheckLintInFile.vala',
+	'src/visitors/CheckCodeActionsInFile.vala',
 	'src/visitors/FindNode.vala',
 	'src/visitors/FindNodeInFile.vala',
 	'src/visitors/FindNodeInFileNop.vala',
@@ -18,7 +20,6 @@ common_sources = files([
 	'src/visitors/FindSymbolsInFile.vala',
 	'src/visitors/FindCodeLensSymbolsInFile.vala',
 	'src/visitors/FindCodeLensSymbolInFile.vala',
-	'src/visitors/CheckLintInFile.vala',
 	'src/helpers/CodeHelpers.vala',
 	'src/helpers/CompletionHelpers.vala',
 	'src/helpers/DocumentSymbolHelpers.vala',
@@ -55,6 +56,7 @@ endif
 add_project_arguments([
 		'--enable-gobject-tracing',
 		# '--disable-warnings',
+  	# '--enable-experimental-non-null',
 	], language: 'vala')
 
 # add_project_arguments([

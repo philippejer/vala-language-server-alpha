@@ -1352,9 +1352,9 @@ namespace Vls
       SourceFile? source_file = get_source_file(fileuri);
       if (source_file == null) return null;
 
-      var check_lint = new CheckLintInFile(source_file.vala_file, lint_config, code_action_params.range);
-      check_lint.find();
-      return check_lint.actions;
+      var check_code_actions = new CheckCodeActionsInFile(source_file.vala_file, lint_config, code_action_params.range);
+      check_code_actions.find();
+      return check_code_actions.actions;
     }
 
     private void on_textDocument_codeLens(Jsonrpc.Client client, Variant id, Variant @params) throws Error
