@@ -17,7 +17,7 @@ namespace Vls
     RequestCancelled = -32800,
     ContentModified = -32801,
   }
-  
+
   public class InitializeParams : AbstractJsonSerializableObject
   {
     /**
@@ -26,7 +26,7 @@ namespace Vls
      * If the parent process is not alive then the server should exit (see exit notification) its process.
      */
     //  int processId;
-  
+
     /**
      * The rootPath of the workspace. Is null
      * if no folder is open.
@@ -34,29 +34,29 @@ namespace Vls
      * @deprecated in favour of rootUri.
      */
     //  string rootPath;
-  
+
     /**
      * The rootUri of the workspace. Is null if no
      * folder is open. If both `rootPath` and `rootUri` are set
      * `rootUri` wins.
      */
     public string rootUri { get; set; }
-  
+
     /**
      * User provided initialization options.
      */
-    public ServerConfig initializationOptions { get; set; }
-  
+    public ServerConfig? initializationOptions { get; set; }
+
     /**
      * The capabilities provided by the client (editor or tool)
      */
     //  capabilities: ClientCapabilities;
-  
+
     /**
      * The initial trace setting. If omitted trace is disabled ('off').
      */
     //  trace?: 'off' | 'messages' | 'verbose';
-  
+
     /**
      * The workspace folders configured in the client when the server starts.
      * This property is only available if the client supports workspace folders.
@@ -294,7 +294,7 @@ namespace Vls
      */
     public string pattern { get; set; }
   }
-  
+
   public class CodeLensRegistrationOptions : TextDocumentRegistrationOptions
   {
     /**
@@ -302,13 +302,53 @@ namespace Vls
      */
     public bool resolveProvider { get; set; }
   }
-  
+
   public class CodeLensOptions : TextDocumentRegistrationOptions
   {
     /**
      * Code lens has a resolve provider as well.
      */
     public bool resolveProvider { get; set; }
+  }
+
+  public class DidOpenTextDocumentParams : AbstractJsonSerializableObject
+  {
+    /**
+     * The document that was opened.
+     */
+    public TextDocumentItem textDocument { get; set; }
+  }
+
+  public class TextDocumentItem : AbstractJsonSerializableObject
+  {
+    /**
+     * The text document's URI.
+     */
+    public string uri { get; set; }
+
+    /**
+     * The text document's language identifier.
+     */
+    public string languageId { get; set; }
+
+    /**
+     * The version number of this document (it will increase after each
+     * change, including undo/redo).
+     */
+    public int version { get; set; }
+
+    /**
+     * The content of the opened text document.
+     */
+    public string text { get; set; }
+  }
+
+  public class DidCloseTextDocumentParams : AbstractJsonSerializableObject
+  {
+    /**
+     * The document that was closed.
+     */
+    public TextDocumentIdentifier textDocument { get; set; }
   }
 
   public class DidChangeTextDocumentParams : AbstractJsonSerializableObject
@@ -347,7 +387,7 @@ namespace Vls
     /**
      * The range of the document that changed.
      */
-    public Range range { get; set; }
+    public Range? range { get; set; }
 
     /**
      * The length of the range that got replaced.
@@ -865,12 +905,12 @@ namespace Vls
      * The name of this symbol. Will be displayed in the user interface and therefore must not be
      * an empty string or a string only consisting of white spaces.
      */
-    public string name { get; set; }
+    public string? name { get; set; }
 
     /**
      * More detail for this symbol, e.g the signature of a function.
      */
-    public string detail { get; set; }
+    public string? detail { get; set; }
 
     /**
      * The kind of this symbol.
@@ -887,13 +927,13 @@ namespace Vls
      * like comments. This information is typically used to determine if the clients cursor is
      * inside the symbol to reveal in the symbol in the UI.
      */
-    public Range range { get; set; }
+    public Range? range { get; set; }
 
     /**
      * The range that should be selected and revealed when this symbol is being picked, e.g the name of a function.
      * Must be contained by the `range`.
      */
-    public Range selectionRange { get; set; }
+    public Range? selectionRange { get; set; }
 
     /**
      * Children of this symbol, e.g. properties of a class.
@@ -1197,9 +1237,14 @@ namespace Vls
     */
     SourceOrganizeImports;
 
-    public static CodeActionKindEnum from_json(string? value)
+    public static CodeActionKindEnum? from_json(string? value)
     {
-      switch (value)
+      if (value == null)
+      {
+        return null;
+      }
+
+      switch ((string)value)
       {
       case "": return CodeActionKindEnum.Empty;
       case "quickfix": return CodeActionKindEnum.QuickFix;
@@ -1213,7 +1258,7 @@ namespace Vls
       }
     }
 
-    public string? to_json()
+    public string to_json()
     {
       switch (this)
       {
@@ -1225,7 +1270,7 @@ namespace Vls
       case CodeActionKindEnum.RefactorRewrite: return "refactor.rewrite";
       case CodeActionKindEnum.Source: return "source";
       case CodeActionKindEnum.SourceOrganizeImports: return "source.organizeImports";
-      default: return null;
+      default: return "???";
       }
     }
   }
@@ -1241,7 +1286,7 @@ namespace Vls
 
     public Json.Node serialize()
     {
-      var node = new Json.Node(Json.NodeType.VALUE);
+      Json.Node node = new Json.Node(Json.NodeType.VALUE);
       node.set_string(value.to_json());
       return node;
     }
@@ -1252,7 +1297,14 @@ namespace Vls
       {
         return false;
       }
-      value = CodeActionKindEnum.from_json(node.get_string());
+
+      CodeActionKindEnum? value = CodeActionKindEnum.from_json(node.get_string());
+      if (value == null)
+      {
+        return false;
+      }
+
+      this.value = value;
       return true;
     }
   }
@@ -1336,7 +1388,7 @@ namespace Vls
       return base.create_collection(property_name);
     }
   }
-  
+
   public class CodeLensParams : AbstractJsonSerializableObject
   {
     /**

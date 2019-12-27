@@ -16,14 +16,10 @@ namespace Vls
 
     protected override bool check_node(Vala.CodeNode node)
     {
-      var source_reference = node.source_reference;
-      if (source_reference == null)
+      unowned Vala.SourceReference? source_reference = node.source_reference;
+      if (source_reference == null || source_reference.file != file)
       {
         return true;
-      }
-      if (source_reference.file != file)
-      {
-        return false;
       }
 
       check_node_in_file(node);

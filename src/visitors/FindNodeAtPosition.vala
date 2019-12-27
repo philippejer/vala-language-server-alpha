@@ -14,9 +14,14 @@ namespace Vls
 
     protected override void check_node_in_file(Vala.CodeNode node)
     {
-      var source_reference = node.source_reference;      
-      Vala.SourceLocation begin = source_reference.begin;
-      Vala.SourceLocation end = source_reference.end;
+      unowned Vala.SourceReference? source_reference = node.source_reference;
+      if (source_reference == null)
+      {
+        return;
+      }
+
+      unowned Vala.SourceLocation begin = source_reference.begin;
+      unowned Vala.SourceLocation end = source_reference.end;
 
       if (begin.line > end.line)
       {

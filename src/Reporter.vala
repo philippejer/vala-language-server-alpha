@@ -30,7 +30,7 @@ namespace Vls
       }
       else
       {
-        add_source_error(source, message, ref notes_by_file);
+        add_source_error(source, "Note: " + message, ref notes_by_file);
       }
     }
 
@@ -47,7 +47,7 @@ namespace Vls
       }
       else
       {
-        add_source_error(source, message, ref notes_by_file);
+        add_source_error(source, "Deprecated: " + message, ref notes_by_file);
       }
     }
 
@@ -64,7 +64,7 @@ namespace Vls
       }
       else
       {
-        add_source_error(source, message, ref warnings_by_file);
+        add_source_error(source, "Warning: " + message, ref warnings_by_file);
       }
     }
 
@@ -77,7 +77,7 @@ namespace Vls
       }
       else
       {
-        add_source_error(source, message, ref errors_by_file);
+        add_source_error(source, "Error: " + message, ref errors_by_file);
       }
     }
 
@@ -91,18 +91,22 @@ namespace Vls
       }
       else
       {
-        add_source_error(source, "(suppressed) " + message, ref errors_by_file);
+        add_source_error(source, "Suppressed error: " + message, ref errors_by_file);
       }
     }
 #endif
 
     private static void add_source_error(Vala.SourceReference source, string message, ref Gee.HashMap<string, Gee.ArrayList<SourceError>> errors_by_file)
     {
-      var errors = errors_by_file[source.file.filename];
-      if (errors == null)
+      Gee.ArrayList<SourceError> errors;
+      if (!errors_by_file.has_key(source.file.filename))
       {
         errors = new Gee.ArrayList<SourceError>();
-        errors_by_file[source.file.filename] = errors;
+        errors_by_file.set(source.file.filename, errors);
+      }
+      else
+      {
+        errors = errors_by_file.get(source.file.filename);
       }
       errors.add(new SourceError(source, message));
     }

@@ -21,50 +21,52 @@ namespace Vls
       {
         return;
       }
+
       symbols.add(symbol);
 
-      if (best_node == null)
+      unowned Vala.CodeNode? current_best_node = this.best_node;
+      unowned Vala.Symbol? current_best_symbol = this.best_symbol;
+      if (current_best_node == null || current_best_symbol == null)
       {
         if (loginfo) info(@"Found first symbol: '$(code_node_to_string(symbol))'");
         best_node = node;
         best_symbol = symbol;
+        return;
       }
-      else
+
+      bool is_inside = code_node_is_inside(node, current_best_node);
+      if (is_inside)
       {
-        bool is_inside = code_node_is_inside(node, best_node);
-        if (is_inside)
+        if (code_node_matches(node, current_best_node))
         {
-          if (code_node_matches(node, best_node))
+          if (best_node is Vala.Symbol && !(node is Vala.Symbol))
           {
-            if (best_node is Vala.Symbol && !(node is Vala.Symbol))
-            {
-              if (loginfo) info(@"Found worse symbol (best node is a symbol, not current node): '$(code_node_to_string(symbol))'");
-            }
-            else
-            {
-              if (loginfo) info(@"Found better symbol (matching symbols): '$(code_node_to_string(symbol))'");
-              best_node = node;
-              best_symbol = symbol;
-            }
+            if (loginfo) info(@"Found worse symbol (best node is a symbol, not current node): '$(code_node_to_string(symbol))'");
           }
           else
           {
-            if (best_symbol.parent_symbol == symbol)
-            {
-              if (loginfo) info(@"Found worse symbol (more focused but parent of current best symbol): '$(code_node_to_string(symbol))'");
-            }
-            else
-            {
-              if (loginfo) info(@"Found better symbol (more focused): '$(code_node_to_string(symbol))'");
-              best_node = node;
-              best_symbol = symbol;
-            }
+            if (loginfo) info(@"Found better symbol (matching symbols): '$(code_node_to_string(symbol))'");
+            best_node = node;
+            best_symbol = symbol;
           }
         }
         else
         {
-          if (loginfo) info(@"Found worse symbol (less focused): '$(code_node_to_string(symbol))'");
+          if (current_best_symbol.parent_symbol == symbol)
+          {
+            if (loginfo) info(@"Found worse symbol (more focused but parent of current best symbol): '$(code_node_to_string(symbol))'");
+          }
+          else
+          {
+            if (loginfo) info(@"Found better symbol (more focused): '$(code_node_to_string(symbol))'");
+            best_node = node;
+            best_symbol = symbol;
+          }
         }
+      }
+      else
+      {
+        if (loginfo) info(@"Found worse symbol (less focused): '$(code_node_to_string(symbol))'");
       }
     }
   }

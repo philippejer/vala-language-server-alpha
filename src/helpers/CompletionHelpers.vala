@@ -15,7 +15,7 @@ namespace Vls
     /** Returns the list of completions at the specified position. */
     public static CompletionList? get_completion_list(Context context, SourceFile source_file, Position position) throws Error
     {
-      string completion_member;
+      string? completion_member;
       int position_index;
       Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, position.line, position.character, out completion_member, out position_index);
       if (symbols == null)
@@ -24,24 +24,33 @@ namespace Vls
       }
 
       int non_space_index = skip_source_spaces(source_file.content, position_index);
-      bool is_before_paren = source_file.content[non_space_index] == '(';
-      var completion_items = new JsonArrayList<CompletionItem>();
+      bool is_before_paren = (source_file.content[non_space_index] == '(');
+
+      JsonArrayList<CompletionItem> completion_items = new JsonArrayList<CompletionItem>();
       Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
         string name = iter.get_key();
         OrderedSymbol ordered_symbol = iter.get_value();
+
         Vala.Symbol symbol = ordered_symbol.symbol;
-        string code = get_symbol_definition_code(symbol);
-        var completion_item = new CompletionItem();
+        string? code = get_symbol_definition_code(symbol);
+        if (code == null)
+        {
+          break;
+        }
+
+        CompletionItem completion_item = new CompletionItem();
         completion_item.label = name;
+        completion_item.kind = get_completion_item_kind(symbol);
         completion_item.documentation = new MarkupContent()
         {
           kind = MarkupContent.KIND_MARKDOWN,
           value = @"```vala\n$(code)\n```"
         };
         completion_item.sortText = "%03d:%s".printf(ordered_symbol.order, code);
-        if (method_completion_mode != MethodCompletionMode.OFF && !is_before_paren && (symbol is Vala.Callable))
+
+        if (method_completion_mode != MethodCompletionMode.OFF && (symbol is Vala.Callable) && !is_before_paren)
         {
           completion_item.insertTextFormat = InsertTextFormat.Snippet;
           string completion_space = method_completion_mode == MethodCompletionMode.SPACE ? " " : "";
@@ -65,7 +74,7 @@ namespace Vls
           completion_item.insertText = name;
           completion_item.insertTextFormat = InsertTextFormat.PlainText;
         }
-        completion_item.kind = get_completion_item_kind(symbol);
+
         completion_items.add(completion_item);
       }
 
@@ -126,6 +135,7 @@ namespace Vls
       {
         return CompletionItemKind.Event;
       }
+
       return CompletionItemKind.Text;
     }
 
@@ -137,9 +147,10 @@ namespace Vls
      *    'int __completion_symbol__ = [completion_expression];'
      * 3. Rebuild the syntax tree, find the '__completion_symbol__' node and inspect it to infer a list of proposals.
      */
-    private static Gee.Map<string, OrderedSymbol>? get_completion_symbols(Context context, SourceFile source_file, uint line, uint character, out string completion_member, out int position_index) throws Error
+    private static Gee.Map<string, OrderedSymbol>? get_completion_symbols(Context context, SourceFile source_file, uint line, uint character, out string? completion_member, out int position_index) throws Error
     {
       completion_member = null;
+
       string original_source = source_file.content;
       try
       {
@@ -192,8 +203,47 @@ namespace Vls
       while (current >= 0)
       {
         char c = source[current];
-        if (in_string)
+        if (!in_string)
         {
+          if (c == '"')
+          {
+            // Consume any (triple) string
+            in_string = true;
+            if (current >= 2 && source[current - 1] == '"' && source[current - 2] == '"')
+            {
+              in_triple_string = true;
+              current -= 2;
+            }
+          }
+          else if ((last_non_space_char == '.' || num_delimiters > 0) && (c == ')' || c == ']'))
+          {
+            // Consume any delimited expression inside the inner expression
+            num_delimiters += 1;
+          }
+          else if (num_delimiters > 0 && (c == '(' || c == '['))
+          {
+            num_delimiters -= 1;
+          }
+          else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.')
+          {
+            // Stop when encountering a non-identifier symbol other than '.' (member access)
+            break;
+          }
+          else if (num_delimiters == 0 && last_char.isspace() && last_non_space_char != '(' && is_identifier_char(c))
+          {
+            // Stop when encountering an identifier after a space (unless it looks like a method call)
+            break;
+          }
+
+          last_char = c;
+          if (!c.isspace())
+          {
+            last_non_space_char = c;
+          }
+        }
+        else
+        {
+          // Try to detect the end of the string
           if (c == '"')
           {
             if (in_triple_string && current >= 2 && source[current - 1] == '"' && source[current - 2] == '"')
@@ -205,39 +255,6 @@ namespace Vls
             {
               in_string = false;
             }
-          }
-        }
-        else
-        {
-          if (c == '"')
-          {
-            in_string = true;
-            if (current >= 2 && source[current - 1] == '"' && source[current - 2] == '"')
-            {
-              in_triple_string = true;
-              current -= 2;
-            }
-          }
-          else if ((last_non_space_char == '.' || num_delimiters > 0) && (c == ')' || c == ']'))
-          {
-            num_delimiters += 1;
-          }
-          else if (num_delimiters > 0 && (c == '(' || c == '['))
-          {
-            num_delimiters -= 1;
-          }
-          else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.')
-          {
-            break;
-          }
-          else if (num_delimiters == 0 && last_char.isspace() && last_non_space_char != '(' && is_identifier_char(c))
-          {
-            break;
-          }
-          last_char = c;
-          if (!c.isspace())
-          {
-            last_non_space_char = c;
           }
         }
         current -= 1;
@@ -266,16 +283,23 @@ namespace Vls
     /**
      * Finds the inserted 'int __completion_symbol__ = [completion_expression];' variable declaration and inspect it to determine a list of completions.
      */
-    private static Gee.Map<string, OrderedSymbol>? compute_completion_symbols(SourceFile source_file, out string completion_member)
+    private static Gee.Map<string, OrderedSymbol>? compute_completion_symbols(SourceFile source_file, out string? completion_member)
     {
       completion_member = null;
-      Vala.Symbol? completion_symbol = find_completion_symbol(source_file.vala_file, completion_symbol_name);
+
+      unowned Vala.SourceFile? vala_file = source_file.vala_file;
+      if (vala_file == null)
+      {
+        return null;
+      }
+
+      Vala.Symbol? completion_symbol = find_completion_symbol(vala_file, completion_symbol_name);
       if (completion_symbol == null)
       {
         return null;
       }
 
-      var completion_variable = completion_symbol as Vala.Variable;
+      unowned Vala.Variable? completion_variable = completion_symbol as Vala.Variable;
       if (completion_variable == null)
       {
         if (logwarn) warning("Completion symbol is not a variable");
@@ -285,7 +309,7 @@ namespace Vls
       if (loginfo) info(@"Completion symbol: '$(code_scope_to_string(completion_variable))'");
       if (loginfo) info(@"Completion symbol initializer: '$(code_node_to_string(completion_variable.initializer))'");
 
-      Vala.MemberAccess? completion_initializer = completion_variable.initializer as Vala.MemberAccess;
+      unowned Vala.MemberAccess? completion_initializer = completion_variable.initializer as Vala.MemberAccess;
       if (completion_initializer == null)
       {
         if (logwarn) warning("Completion initializer is not a member access");
@@ -302,7 +326,7 @@ namespace Vls
       if (loginfo) info(@"Completion symbol parent namespace: '$(code_scope_to_string(parent_namespace))'");
 
       completion_member = completion_initializer.member_name;
-      Vala.Expression? completion_inner = completion_initializer.inner;
+      unowned Vala.Expression? completion_inner = completion_initializer.inner;
       if (completion_inner == null)
       {
         bool in_instance = parent_method != null && parent_method.binding == Vala.MemberBinding.INSTANCE;
@@ -316,7 +340,7 @@ namespace Vls
       }
       if (loginfo) info(@"Completion inner expression: '$(code_scope_to_string(completion_inner))'");
 
-      bool? is_instance;
+      bool is_instance;
       Vala.Symbol? completion_inner_type = get_expression_type(completion_inner, out is_instance);
       if (completion_inner_type == null)
       {
@@ -359,8 +383,9 @@ namespace Vls
 
     private static Vala.Symbol? find_completion_symbol(Vala.SourceFile file, string name)
     {
-      var finder = new FindSymbolByName(file, name);
+      FindSymbolByName finder = new FindSymbolByName(file, name);
       finder.find();
+
       if (finder.symbols.is_empty)
       {
         if (loginfo) info("Cannot find completion symbol");
@@ -380,6 +405,7 @@ namespace Vls
     private static void filter_completion_symbols(Gee.Map<string, OrderedSymbol> symbols, string name)
     {
       string name_down = name.down();
+
       Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
@@ -397,17 +423,16 @@ namespace Vls
      */
     private static Gee.Map<string, OrderedSymbol> find_global_symbols(Vala.CodeNode node, SymbolFlags flags)
     {
-      var symbols = new Gee.TreeMap<string, OrderedSymbol>();
+      Gee.TreeMap<string, OrderedSymbol> symbols = new Gee.TreeMap<string, OrderedSymbol>();
       add_global_symbols(node, symbols, flags, 0);
-      if (node.source_reference != null && node.source_reference.using_directives != null)
+
+      unowned Vala.SourceReference? source_reference = node.source_reference;
+      if (source_reference != null)
       {
-        foreach (Vala.UsingDirective using_directive in node.source_reference.using_directives)
+        foreach (Vala.UsingDirective using_directive in source_reference.using_directives)
         {
-          if (using_directive.namespace_symbol != null)
-          {
-            if (logdebug) debug(@"Add symbols for using directive: '$(using_directive.namespace_symbol.name)'");
-            add_scope_symbols(using_directive.namespace_symbol, symbols, flags, 1000);
-          }
+          if (logdebug) debug(@"Add symbols for using directive: '$(code_node_to_string(using_directive.namespace_symbol))'");
+          add_scope_symbols(using_directive.namespace_symbol, symbols, flags, 1000);
         }
       }
       return symbols;
@@ -416,19 +441,18 @@ namespace Vls
     /** Accumulates the global symbols starting from the scope of 'node' (recursively). */
     private static void add_global_symbols(Vala.CodeNode node, Gee.Map<string, OrderedSymbol> symbols, SymbolFlags flags, int order)
     {
-      Vala.Symbol? symbol = node as Vala.Symbol;
+      unowned Vala.Symbol? symbol = node as Vala.Symbol;
       if (symbol != null)
       {
         add_scope_symbols(symbol, symbols, flags, order);
-        var base_types = get_base_types(symbol);
-        if (base_types != null)
+
+        Gee.ArrayList<Vala.Symbol> base_types = get_base_types(symbol);
+        foreach (Vala.Symbol base_type in base_types)
         {
-          foreach (Vala.Symbol base_type in base_types)
-          {
-            add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE, order + 1);
-          }
+          add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE, order + 1);
         }
       }
+
       Vala.CodeNode? parent_node = get_node_parent(node);
       if (parent_node != null)
       {
@@ -442,16 +466,15 @@ namespace Vls
      */
     private static Gee.Map<string, OrderedSymbol> get_extended_symbols(Vala.Symbol symbol, SymbolFlags flags = SymbolFlags.ALL)
     {
-      var symbols = new Gee.TreeMap<string, OrderedSymbol>();
+      Gee.TreeMap<string, OrderedSymbol> symbols = new Gee.TreeMap<string, OrderedSymbol>();
       add_scope_symbols(symbol, symbols, flags, 0);
-      var base_types = get_base_types(symbol);
-      if (base_types != null)
+
+      Gee.ArrayList<Vala.Symbol> base_types = get_base_types(symbol);
+      foreach (Vala.Symbol base_type in base_types)
       {
-        foreach (Vala.Symbol base_type in base_types)
-        {
-          add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE, 1);
-        }
+        add_scope_symbols(base_type, symbols, flags & ~SymbolFlags.PRIVATE, 1);
       }
+
       return symbols;
     }
 
@@ -463,16 +486,18 @@ namespace Vls
       {
         return;
       }
-      Vala.Map<string, Vala.Symbol> table = scope.get_symbol_table();
+
+      Vala.Map<string, Vala.Symbol>? table = scope.get_symbol_table();
       if (table == null)
       {
         return;
       }
+
       Vala.MapIterator<string, Vala.Symbol> iter = table.map_iterator();
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
         string name = iter.get_key();
-        Vala.Symbol scope_symbol = iter.get_value();        
+        Vala.Symbol scope_symbol = iter.get_value();
         if (!is_symbol_compatible_with_flags(scope_symbol, flags))
         {
           continue;
@@ -499,7 +524,8 @@ namespace Vls
       {
         return "null (CodeNode)";
       }
-      var symbol = node as Vala.Symbol;
+
+      unowned Vala.Symbol? symbol = node as Vala.Symbol;
       if (symbol != null)
       {
         return @"name: '$(symbol.name ?? "[unnamed symbol]")', type: '$(node.type_name)', source: '$(source_reference_to_string(node.source_reference))', scope: '$(symbol_scope_to_string(symbol))'";
@@ -513,14 +539,22 @@ namespace Vls
     /** Returns a string representation for the children symbols of 'parent_symbol'. */
     private static string symbol_scope_to_string(Vala.Symbol parent_symbol, SymbolFlags flags = SymbolFlags.ALL)
     {
-      var builder = new StringBuilder();
-      builder.append("(");
-      bool first = true;
+      StringBuilder builder = new StringBuilder();
+
       Gee.Map<string, OrderedSymbol> table = get_extended_symbols(parent_symbol, flags);
       Gee.MapIterator<string, OrderedSymbol> iter = table.map_iterator();
+
+      bool first = true;
+      builder.append("(");
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
         Vala.Symbol symbol = iter.get_value().symbol;
+        unowned string? symbol_name = symbol.name;
+        if (symbol_name == null)
+        {
+          break;
+        }
+
         if (first)
         {
           first = false;
@@ -529,42 +563,38 @@ namespace Vls
         {
           builder.append(", ");
         }
-        builder.append(symbol_to_string_extended(symbol));
+
+        builder.append(symbol_name);
+        builder.append(" (");
+        if (symbol_is_instance_member(symbol))
+        {
+          builder.append("ins");
+        }
+        else
+        {
+          builder.append("typ");
+        }
+        if (symbol.access == Vala.SymbolAccessibility.PUBLIC)
+        {
+          builder.append("|pub");
+        }
+        else if (symbol.access == Vala.SymbolAccessibility.PROTECTED)
+        {
+          builder.append("|pro");
+        }
+        else if (symbol.access == Vala.SymbolAccessibility.PRIVATE)
+        {
+          builder.append("|pri");
+        }
+        else if (symbol.access == Vala.SymbolAccessibility.INTERNAL)
+        {
+          builder.append("|int");
+        }
+        builder.append(")");
       }
       builder.append(")");
-      return builder.str;
-    }
 
-    private static string symbol_to_string_extended(Vala.Symbol symbol)
-    {
-      string name = symbol.name;
-      string result = name + " (";
-      if (symbol_is_instance_member(symbol))
-      {
-        result += "ins";
-      }
-      else
-      {
-        result += "typ";
-      }
-      if (symbol.access == Vala.SymbolAccessibility.PUBLIC)
-      {
-        result += "|pub";
-      }
-      else if (symbol.access == Vala.SymbolAccessibility.PROTECTED)
-      {
-        result += "|pro";
-      }
-      else if (symbol.access == Vala.SymbolAccessibility.PRIVATE)
-      {
-        result += "|pri";
-      }
-      else if (symbol.access == Vala.SymbolAccessibility.INTERNAL)
-      {
-        result += "|int";
-      }
-      result += ")";
-      return result;
+      return builder.str;
     }
 
     private static SignatureHelp? last_signature_help = null;
@@ -599,10 +629,10 @@ namespace Vls
         return null;
       }
 
-      string completion_member;
+      string? completion_member;
       int position_index;
       Gee.Map<string, OrderedSymbol>? symbols = get_completion_symbols(context, source_file, line, character, out completion_member, out position_index);
-      if (symbols == null)
+      if (symbols == null || completion_member == null)
       {
         return null;
       }
@@ -614,19 +644,29 @@ namespace Vls
         return null;
       }
 
-      Vala.Symbol completion_symbol = ordered_symbol.symbol;
-      Vala.Method? completion_method = completion_symbol as Vala.Method;
-      if (completion_method == null)
+      unowned Vala.Symbol completion_symbol = ordered_symbol.symbol;
+      unowned string? completion_symbol_name = completion_symbol.name;
+      if (completion_symbol_name == null)
       {
-        if (logwarn) warning(@"Completion symbol is not a method: '$(code_node_to_string(completion_symbol))'");
         return null;
       }
 
-      string definition_code = get_symbol_definition_code_with_comment(completion_method);
+      unowned Vala.Method? completion_method = completion_symbol as Vala.Method;
+      if (completion_method == null || completion_method.name == null)
+      {
+        if (logwarn) warning(@"Completion symbol is not a valid method: '$(code_node_to_string(completion_symbol))'");
+        return null;
+      }
+
+      string? definition_code = get_symbol_definition_code_with_comment(completion_method);
+      if (definition_code == null)
+      {
+        return null;
+      }
       if (loginfo) info(@"Found symbol definition code: '$(definition_code)'");
 
-      var signature_information = new SignatureInformation();
-      signature_information.label = @"$(completion_symbol.name)()";
+      SignatureInformation signature_information = new SignatureInformation();
+      signature_information.label = @"$(completion_symbol_name)()";
       signature_information.documentation = new MarkupContent()
       {
         kind = MarkupContent.KIND_MARKDOWN,
@@ -634,7 +674,7 @@ namespace Vls
       };
       signature_information.parameters = new JsonArrayList<ParameterInformation>();
 
-      var signature_help = new SignatureHelp();
+      SignatureHelp signature_help = new SignatureHelp();
       signature_help.signatures = new JsonArrayList<SignatureInformation>();
       signature_help.signatures.add(signature_information);
       signature_help.activeSignature = 0;

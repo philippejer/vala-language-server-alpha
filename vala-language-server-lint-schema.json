@@ -6,7 +6,7 @@
 		"level": {
       "description": "Determines the error level",
 			"type": "string",
-			"enum": [ "error", "warn", "info", "hint", "ignore" ]
+			"enum": [ "error", "warn", "info", "hint", "action", "ignore" ]
 		}
 	},
 
@@ -17,6 +17,18 @@
 		},
 		"no-unqualified-static-access": {
 			"description": "This rule checks that every access to static class members is explicit. [default level: ignore]",
+			"allOf": [ { "$ref": "#/definitions/level" } ]
+		},
+		"no-implicit-non-null-cast": {
+			"description": "This rule checks that every cast from nullable to non-null is explicit. [default level: ignore]",
+			"allOf": [ { "$ref": "#/definitions/level" } ]
+		},
+		"no-type-inference": {
+			"description": "This rule checks that local variable declarations have an explicit type. [default level: ignore]",
+			"allOf": [ { "$ref": "#/definitions/level" } ]
+		},
+		"no-type-inference-unless-evident": {
+			"description": "This rule checks that local variable declarations have an explicit type, unless evident (i.e. object creation and type casts). [default level: ignore]",
 			"allOf": [ { "$ref": "#/definitions/level" } ]
 		}
 	}

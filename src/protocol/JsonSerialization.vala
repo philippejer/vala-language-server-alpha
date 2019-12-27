@@ -7,38 +7,38 @@ namespace Vls
       return false;
     }
 
-    public virtual Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
+    public virtual Json.Node? serialize_property(string property_name, Value value, ParamSpec pspec)
     {
       // Serialize primitive types explicitly otherwise zero values are ignored for some reason...
       if (pspec.value_type.is_a(typeof(int)))
       {
         int val = value.get_int();
-        var node = new Json.Node(Json.NodeType.VALUE);
+        Json.Node node = new Json.Node(Json.NodeType.VALUE);
         node.set_int(val);
         return node;
       }
       else if (pspec.value_type.is_a(typeof(double)))
       {
         double val = value.get_double();
-        var node = new Json.Node(Json.NodeType.VALUE);
+        Json.Node node = new Json.Node(Json.NodeType.VALUE);
         node.set_double(val);
         return node;
       }
       else if (pspec.value_type.is_a(typeof(bool)))
       {
         bool val = value.get_boolean();
-        var node = new Json.Node(Json.NodeType.VALUE);
+        Json.Node node = new Json.Node(Json.NodeType.VALUE);
         node.set_boolean(val);
         return node;
       }
       else if (pspec.value_type.is_a(typeof(JsonSerializableValue)))
       {
-        unowned JsonSerializableValue val = @value as JsonSerializableValue;
+        unowned JsonSerializableValue? val = value as JsonSerializableValue;
         if (val == null)
         {
           if (serialize_nulls())
           {
-            var node = new Json.Node(Json.NodeType.NULL);
+            Json.Node node = new Json.Node(Json.NodeType.NULL);
             return node;
           }
           else
@@ -51,22 +51,28 @@ namespace Vls
           return val.serialize();
         }
       }
-      return default_serialize_property(property_name, @value, pspec);
+
+      return default_serialize_property(property_name, value, pspec);
     }
 
-    public virtual bool deserialize_property(string property_name, ref Value @value, ParamSpec pspec, Json.Node property_node)
+    public virtual bool deserialize_property(string property_name, ref Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(JsonSerializableValue)))
       {
-        JsonSerializableValue val = create_value(pspec.value_type, property_name);
-        if (val.deserialize(property_node))
+        JsonSerializableValue? json_value = create_value(pspec.value_type, property_name);
+        if (json_value == null)
+        {
+          return false;
+        }
+        if (json_value.deserialize(property_node))
         {
           value = Value(pspec.value_type);
-          value.set_object(val);
+          value.set_object(json_value);
         }
         return true;
       }
-      return default_deserialize_property(property_name, ref @value, pspec, property_node);
+
+      return default_deserialize_property(property_name, ref value, pspec, property_node);
     }
 
     private JsonSerializableValue? create_value(Type value_type, string property_name)
@@ -112,27 +118,31 @@ namespace Vls
 
     public static Json.Node serialize_collection(JsonSerializableCollection<T> list)
     {
-      var array = new Json.Array.sized(list.size);
+      Json.Array array = new Json.Array.sized(list.size);
+
       Type element_type = list.get_element_type();
       if (element_type.is_a(typeof(int)))
       {
-        foreach (int val in (JsonSerializableCollection<int>)list)
+        foreach (int value in (JsonSerializableCollection<int>)list)
         {
-          array.add_int_element(val);
+          array.add_int_element(value);
         }
       }
       else if (element_type.is_a(typeof(double)))
       {
-        foreach (double? val in (JsonSerializableCollection<double?>)list)
+        foreach (double? value in (JsonSerializableCollection<double?>)list)
         {
-          array.add_double_element(val);
+          if (value != null)
+          {
+            array.add_double_element(value);
+          }
         }
       }
       else if (element_type.is_a(typeof(bool)))
       {
-        foreach (bool val in (JsonSerializableCollection<bool>)list)
+        foreach (bool value in (JsonSerializableCollection<bool>)list)
         {
-          array.add_boolean_element(val);
+          array.add_boolean_element(value);
         }
       }
       else if (element_type.is_a(typeof(string)))
@@ -144,9 +154,9 @@ namespace Vls
       }
       else if (element_type.is_a(typeof(JsonSerializableValue)))
       {
-        foreach (JsonSerializableValue val in (JsonSerializableCollection<JsonSerializableValue>)list)
+        foreach (JsonSerializableValue value in (JsonSerializableCollection<JsonSerializableValue>)list)
         {
-          array.add_element(val.serialize());
+          array.add_element(value.serialize());
         }
       }
       else if (element_type.is_a(typeof(Object)))
@@ -156,19 +166,22 @@ namespace Vls
           array.add_element(Json.gobject_serialize(object));
         }
       }
-      var node = new Json.Node(Json.NodeType.ARRAY);
+
+      Json.Node node = new Json.Node(Json.NodeType.ARRAY);
       node.set_array(array);
+
       return node;
     }
 
     public static bool deserialize_collection(JsonSerializableCollection<T> list, Json.Node property_node)
     {
-      if (property_node.get_node_type() != Json.NodeType.ARRAY)
+      Json.Array? array = (Json.Array)property_node.get_array();
+      if (array == null)
       {
         return false;
       }
+
       Type element_type = list.get_element_type();
-      Json.Array array = property_node.get_array();
       array.foreach_element((array, index, node) =>
       {
         if (element_type.is_a(typeof(int)))
@@ -185,9 +198,10 @@ namespace Vls
         }
         else if (element_type.is_a(typeof(string)))
         {
-          if (!node.is_null())
+          string? elem = node.get_string();
+          if (elem != null)
           {
-            ((JsonSerializableCollection<string>)list).add(node.get_string());
+            ((JsonSerializableCollection<string>)list).add(elem);
           }
         }
         else if (element_type.is_a(typeof(JsonSerializableValue)))
@@ -204,6 +218,7 @@ namespace Vls
           ((JsonSerializableCollection<Object>)list).add(elem);
         }
       });
+
       return true;
     }
   }
@@ -220,21 +235,10 @@ namespace Vls
       base.wrap((owned)items, (owned)equal_func);
     }
 
-    public JsonArrayList<T> add_item(T item)
+    public JsonArrayList.wrap_one(T item, owned Gee.EqualDataFunc<T>? equal_func = null)
     {
+      base((owned)equal_func);
       add(item);
-      return this;
-    }
-
-    public JsonArrayList<T> add_items(T first_item, ...)
-    {
-      add(first_item);
-      var args = va_list();
-      for (T? item = args.arg<T?>(); item != null; item = args.arg<T?>())
-      {
-        add(item);
-      }
-      return this;
     }
 
     public Json.Node serialize()
@@ -251,6 +255,16 @@ namespace Vls
   [GenericAccessors]
   public interface JsonSerializableMap<T> : Gee.Map<string, T>, JsonSerializableValue
   {
+    public T? first()
+    {
+      Gee.Iterator<Gee.Map.Entry<string, T>> iterator = iterator();
+      if (!iterator.next())
+      {
+        return null;
+      }
+      return iterator.get().value;
+    }
+
     public Type get_value_type()
     {
       return typeof(T);
@@ -258,13 +272,13 @@ namespace Vls
 
     public static Json.Node serialize(JsonSerializableMap<T> map)
     {
-      var object = new Json.Object();
+      Json.Object object = new Json.Object();
       Type value_type = map.get_value_type();
       if (value_type.is_a(typeof(int)))
       {
         foreach (Gee.Map.Entry<string, int> entry in ((JsonSerializableMap<int>)map).entries)
         {
-          var node = new Json.Node.alloc().init_int(entry.value);
+          Json.Node node = new Json.Node.alloc().init_int(entry.value);
           object.set_member(entry.key, node);
         }
       }
@@ -272,15 +286,19 @@ namespace Vls
       {
         foreach (Gee.Map.Entry<string, double?> entry in ((JsonSerializableMap<double?>)map).entries)
         {
-          var node = new Json.Node.alloc().init_double(entry.value);
-          object.set_member(entry.key, node);
+          double? value = entry.value;
+          if (value != null)
+          {
+            Json.Node node = new Json.Node.alloc().init_double(value);
+            object.set_member(entry.key, node);
+          }
         }
       }
       else if (value_type.is_a(typeof(bool)))
       {
         foreach (Gee.Map.Entry<string, bool> entry in ((JsonSerializableMap<bool>)map).entries)
         {
-          var node = new Json.Node.alloc().init_boolean(entry.value);
+          Json.Node node = new Json.Node.alloc().init_boolean(entry.value);
           object.set_member(entry.key, node);
         }
       }
@@ -288,7 +306,7 @@ namespace Vls
       {
         foreach (Gee.Map.Entry<string, string> entry in ((JsonSerializableMap<string>)map).entries)
         {
-          var node = new Json.Node.alloc().init_string(entry.value);
+          Json.Node node = new Json.Node.alloc().init_string(entry.value);
           object.set_member(entry.key, node);
         }
       }
@@ -306,19 +324,22 @@ namespace Vls
           object.set_member(entry.key, Json.gobject_serialize(entry.value));
         }
       }
-      var node = new Json.Node(Json.NodeType.OBJECT);
+
+      Json.Node node = new Json.Node(Json.NodeType.OBJECT);
       node.set_object(object);
+
       return node;
     }
 
     public static bool deserialize(JsonSerializableMap<T> map, Json.Node property_node)
     {
-      if (property_node.get_node_type() != Json.NodeType.OBJECT)
+      Json.Object? property_object = property_node.get_object();
+      if (property_object == null)
       {
         return false;
       }
+
       Type value_type = map.get_value_type();
-      Json.Object property_object = property_node.get_object();
       property_object.foreach_member((object, name, node) =>
       {
         if (value_type.is_a(typeof(int)))
@@ -337,23 +358,28 @@ namespace Vls
         {
           if (!node.is_null())
           {
-            ((JsonSerializableMap<string>)map).set(name, node.get_string());
+            string? value = node.get_string();
+            if (value != null)
+            {
+              ((JsonSerializableMap<string>)map).set(name, value);
+            }
           }
         }
         else if (value_type.is_a(typeof(JsonSerializableValue)))
         {
-          JsonSerializableValue val = (JsonSerializableValue)Object.new(value_type);
-          if (val.deserialize(node))
+          JsonSerializableValue value = (JsonSerializableValue)Object.new(value_type);
+          if (value.deserialize(node))
           {
-            ((JsonSerializableMap<JsonSerializableValue>)map).set(name, val);
+            ((JsonSerializableMap<JsonSerializableValue>)map).set(name, value);
           }
         }
         else if (value_type.is_a(typeof(Object)))
         {
-          Object val = Json.gobject_deserialize(value_type, node);
-          ((JsonSerializableMap<Object>)map).set(name, val);
+          Object value = Json.gobject_deserialize(value_type, node);
+          ((JsonSerializableMap<Object>)map).set(name, value);
         }
       });
+
       return true;
     }
   }
@@ -378,17 +404,17 @@ namespace Vls
 
   public class JsonDouble : Object, JsonSerializableValue
   {
-    public double val;
+    public double value;
 
-    public JsonDouble(double val)
+    public JsonDouble(double value)
     {
-      this.val = val;
+      this.value = value;
     }
 
     public Json.Node serialize()
     {
-      var node = new Json.Node(Json.NodeType.VALUE);
-      node.set_double(val);
+      Json.Node node = new Json.Node(Json.NodeType.VALUE);
+      node.set_double(value);
       return node;
     }
 
@@ -398,24 +424,25 @@ namespace Vls
       {
         return false;
       }
-      val = node.get_double();
+
+      value = node.get_double();
       return true;
     }
   }
 
   public class JsonInt : Object, JsonSerializableValue
   {
-    public int val;
+    public int value;
 
-    public JsonInt(int val)
+    public JsonInt(int value)
     {
-      this.val = val;
+      this.value = value;
     }
 
     public Json.Node serialize()
     {
-      var node = new Json.Node(Json.NodeType.VALUE);
-      node.set_int(val);
+      Json.Node node = new Json.Node(Json.NodeType.VALUE);
+      node.set_int(value);
       return node;
     }
 
@@ -425,24 +452,25 @@ namespace Vls
       {
         return false;
       }
-      val = (int)node.get_int();
+
+      value = (int)node.get_int();
       return true;
     }
   }
 
   public class JsonBool : Object, JsonSerializableValue
   {
-    public bool val;
+    public bool value;
 
-    public JsonBool(bool val)
+    public JsonBool(bool value)
     {
-      this.val = val;
+      this.value = value;
     }
 
     public Json.Node serialize()
     {
-      var node = new Json.Node(Json.NodeType.VALUE);
-      node.set_boolean(val);
+      Json.Node node = new Json.Node(Json.NodeType.VALUE);
+      node.set_boolean(value);
       return node;
     }
 
@@ -452,7 +480,8 @@ namespace Vls
       {
         return false;
       }
-      val = node.get_boolean();
+
+      value = node.get_boolean();
       return true;
     }
   }

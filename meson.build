@@ -4,15 +4,14 @@ build_type = get_option('buildtype')
 build_tests = get_option('build_tests')
 
 common_sources = files([
+	'src/Context.vala',
+	'src/Reporter.vala',
 	'src/Server.vala',
 	'src/ServerTypes.vala',
-	'src/Reporter.vala',
-	'src/Context.vala',
 	'src/visitors/CheckLintInFile.vala',
 	'src/visitors/CheckCodeActionsInFile.vala',
 	'src/visitors/FindNode.vala',
 	'src/visitors/FindNodeInFile.vala',
-	'src/visitors/FindNodeInFileNop.vala',
 	'src/visitors/FindNodeAtPosition.vala',
 	'src/visitors/FindSymbolReferenceAtPosition.vala',
 	'src/visitors/FindSymbolByName.vala',
@@ -56,7 +55,6 @@ endif
 add_project_arguments([
 		'--enable-gobject-tracing',
 		# '--disable-warnings',
-  	# '--enable-experimental-non-null',
 	], language: 'vala')
 
 # add_project_arguments([
@@ -70,7 +68,15 @@ if build_type.startswith('debug')
 endif
 
 if vala_version.endswith('-exp')
+	# The compiler is a personal experimental fork of the official compiler
 	add_project_arguments(['--define', 'LIBVALA_EXP'], language: 'vala')
+
+	# Enables the non-null mode with the flag to relax the requirement to cast
+	# when the compiler can statically prove that a variable is non-null
+	add_project_arguments([
+  	'--enable-experimental-non-null',
+  	'--exp-nullable-exemptions',
+	], language: 'vala')
 endif
 
 add_project_arguments(['--pkg=posix'], language: 'vala')
@@ -80,6 +86,7 @@ add_project_arguments([
 	], language: 'c')
 
 if not build_type.startswith('debug')
+	# Use link-time optimization in non-debug builds (can make a lot of difference with Vala-generated code)
   add_project_arguments([
     '-flto'
   ], language: 'c')
@@ -88,12 +95,13 @@ endif
 executable('vala-language-server',
 	dependencies: common_dependencies,
 	sources: [common_sources, 'src/Main.vala'],
-	install: true)
+	include_directories: 'src')
 
 if build_tests
 	test('tests', executable('vala-language-server-tests',
 			dependencies: common_dependencies,
-			sources: [common_sources, 'tests/TestsMain.vala']))
+			sources: [common_sources, 'tests/TestsMain.vala'],
+			include_directories: 'src'))
 endif
 
 # common_library = library('vala-language-server-common',

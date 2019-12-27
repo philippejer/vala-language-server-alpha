@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+- Major improvement in how code lens or document symbol requests are processed when the source code is being edited, wait for the compiler context to be updated before answering the request (otherwise the request will be processed with an out-of-date compiler context and will return bogus results).
+- Related to this, properly handle the (non standard) 'cancel' notifications sent by the client when the server does not answer these requests immediately.
+- Do not show instance symbols for completion inside static methods.
+- Added support for multiple executable build targets, the currently active executable target is switched dynamically based on the opened files.
+- Fixed race condition where the completion could alter the compiler context while the diagnostics are being sent to the client
+- Added lint to avoid use of the 'var' keyword (for those like me who think it makes the code less readable) and replace it with the actual type
+- Added lint to cast to non-null when required by the non-null mode (almost never required with the experimental "null exemption" compiler mode which lets the compiler infer that a variable can never be null, otherwise it requires way too many casts which make the code less readable)
+- Adapted the code to compile in non-null (but only when using the "null exemption" mode)
+
 ## 1.1.0
 - Simplify Meson-base configuration by simply directly reading the 'intro-targets.json' instead of spawning Meson, which did not work well under MinGW.
 - Added support for code lints, with two initial lints to enforce explicit "this" access and/or explicit static member access.

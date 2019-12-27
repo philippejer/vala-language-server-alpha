@@ -21,7 +21,8 @@ namespace Vls
         return;
       }
 
-      if (node.source_reference.begin.line != line || node.source_reference.begin.column != column)
+      unowned Vala.SourceReference? source_reference = node.source_reference;
+      if (source_reference == null || source_reference.begin.line != line || source_reference.begin.column != column)
       {
         return;
       }

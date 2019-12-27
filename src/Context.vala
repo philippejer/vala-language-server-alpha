@@ -46,7 +46,7 @@ namespace Vls
     public bool external;
     public int version;
     public string content;
-    public Vala.SourceFile vala_file = null;
+    public Vala.SourceFile? vala_file = null;
     public bool has_diagnostics = false;
 
     public SourceFile(string filename, string fileuri, bool external = false, int version = 0) throws Error
@@ -68,13 +68,12 @@ namespace Vls
     }
   }
 
-/**
- * The point of this class is to refresh the Vala.CodeContext instead of rebuilding it from scratch.
- */
+  /**
+   * The point of this class is to refresh the Vala.CodeContext instead of rebuilding it from scratch.
+   */
   public class Context
   {
-    public Vala.CodeContext code_context { get; private set; }
-
+    public Vala.CodeContext? code_context = null;
     public Gee.HashSet<string> defines = new Gee.HashSet<string>();
     public Gee.HashSet<string> packages = new Gee.HashSet<string>();
     public Gee.HashSet<string> vapi_directories = new Gee.HashSet<string>();
@@ -96,6 +95,7 @@ namespace Vls
     public bool exp_forbid_delegate_copy = false;
     public bool exp_disable_implicit_namespace = false;
     public bool exp_integer_literal_separator = false;
+    public bool exp_nullable_exemptions = false;
 #endif
 
     public void add_define(string define)
@@ -183,13 +183,13 @@ namespace Vls
         {
           if (other_target != build_target && other_target.exclusive && other_target.active)
           {
-            if (loginfo) info(@"Deactivate target '$(other_target.name)'");
+            if (loginfo) info(@"Deactivate build target '$(other_target.name)'");
             other_target.active = false;
           }
         }
       }
 
-      if (loginfo) info(@"Activate target '$(build_target.name)'");
+      if (loginfo) info(@"Activate build target '$(build_target.name)'");
       build_target.active = true;
     }
 
@@ -200,6 +200,7 @@ namespace Vls
         Vala.CodeContext.pop();
         code_context = null;
       }
+
       defines.clear();
       packages.clear();
       vapi_directories.clear();
@@ -211,27 +212,30 @@ namespace Vls
 
     public Reporter check() throws Error
     {
-      if (code_context != null)
+      if (this.code_context != null)
       {
         // The compiler uses some sort of (deprecated) StaticPrivate stack of CodeContext objects
         Vala.CodeContext.pop();
       }
-
-      code_context = new Vala.CodeContext();
+      Vala.CodeContext code_context = new Vala.CodeContext();
       Vala.CodeContext.push(code_context);
+      this.code_context = code_context;
 
-      var reporter = new Reporter();
-      build_code_context(code_context, reporter);
+      Reporter reporter = new Reporter();
+      reporter.enable_warnings = !disable_warnings;
+      code_context.report = reporter;
+
+      build_context(code_context);
 
       if (reporter.get_errors() > 0)
       {
         return reporter;
       }
 
-      var vala_parser = new Vala.Parser();
+      Vala.Parser vala_parser = new Vala.Parser();
       vala_parser.parse(code_context);
 
-      var genie_parser = new Vala.Genie.Parser();
+      Vala.Genie.Parser genie_parser = new Vala.Genie.Parser();
       genie_parser.parse(code_context);
 
       if (reporter.get_errors() > 0)
@@ -244,46 +248,44 @@ namespace Vls
       return reporter;
     }
 
-    private void build_code_context(Vala.CodeContext code_context, Reporter reporter) throws Error
+    private void build_context(Vala.CodeContext context) throws Error
     {
-      reporter.enable_warnings = !disable_warnings;
-      code_context.report = reporter;
-
-      code_context.experimental_non_null = experimental_non_null;
+      context.experimental_non_null = experimental_non_null;
 
 #if LIBVALA_EXP
-      code_context.exp_public_by_default = exp_public_by_default;
-      code_context.exp_internal_by_default = exp_internal_by_default;
-      code_context.exp_float_by_default = exp_float_by_default;
-      code_context.exp_optional_semicolons = exp_optional_semicolons;
-      code_context.exp_optional_parens = exp_optional_parens;
-      code_context.exp_conditional_attribute = exp_conditional_attribute;
-      code_context.exp_forbid_delegate_copy = exp_forbid_delegate_copy;
-      code_context.exp_disable_implicit_namespace = exp_disable_implicit_namespace;
-      code_context.exp_integer_literal_separator = exp_integer_literal_separator;
+      context.exp_public_by_default = exp_public_by_default;
+      context.exp_internal_by_default = exp_internal_by_default;
+      context.exp_float_by_default = exp_float_by_default;
+      context.exp_optional_semicolons = exp_optional_semicolons;
+      context.exp_optional_parens = exp_optional_parens;
+      context.exp_conditional_attribute = exp_conditional_attribute;
+      context.exp_forbid_delegate_copy = exp_forbid_delegate_copy;
+      context.exp_disable_implicit_namespace = exp_disable_implicit_namespace;
+      context.exp_integer_literal_separator = exp_integer_literal_separator;
+      context.exp_nullable_exemptions = exp_nullable_exemptions;
 
       // This flag allows the parser to continue on trivial syntax errors
-      code_context.exp_resilient_parser = true;
+      context.exp_resilient_parser = true;
 #endif
 
-      code_context.profile = Vala.Profile.GOBJECT;
-      code_context.add_define("GOBJECT");
+      context.profile = Vala.Profile.GOBJECT;
+      context.add_define("GOBJECT");
 
       foreach (string define in defines)
       {
-        code_context.add_define(define);
+        context.add_define(define);
       }
 
-      code_context.set_target_glib_version("2.56");
+      context.set_target_glib_version("2.56");
 
-      code_context.vapi_directories = vapi_directories.to_array();
+      context.vapi_directories = vapi_directories.to_array();
 
-      code_context.add_external_package("glib-2.0");
-      code_context.add_external_package("gobject-2.0");
+      context.add_external_package("glib-2.0");
+      context.add_external_package("gobject-2.0");
 
       foreach (string package in packages)
       {
-        code_context.add_external_package(package);
+        context.add_external_package(package);
       }
 
       active_source_files.clear();
@@ -301,7 +303,7 @@ namespace Vls
           // The source file may have already been added if it is part of several targets
           if (!has_active_source_file(source_file))
           {
-            code_context.add_source_filename(source_file.filename);
+            context.add_source_filename(source_file.filename);
             add_active_source_file(source_file);
           }
         }
@@ -309,12 +311,12 @@ namespace Vls
 
       // Associate each active source file with the corresponding Vala object
       // Also add source files which have been added implicitly to the context (VAPI files from packages)
-      foreach (Vala.SourceFile vala_source_file in code_context.get_source_files())
+      foreach (Vala.SourceFile vala_source_file in context.get_source_files())
       {
         unowned string filename = vala_source_file.filename;
         string fileuri = sanitize_file_uri(Filename.to_uri(filename));
 
-        SourceFile source_file = get_source_file(fileuri);
+        SourceFile? source_file = get_source_file(fileuri);
 
         if (source_file == null)
         {

@@ -15,7 +15,8 @@ namespace Vls
 
     public string to_string()
     {
-      return ((GLib.EnumClass) typeof(LogLevel).class_ref()).get_value(this).value_name.replace("VLS_LOG_LEVEL_", "");
+      GLib.EnumValue? value = ((GLib.EnumClass) typeof(LogLevel).class_ref()).get_value(this);
+      return value == null ? "???" : value.value_name.replace("VLS_LOG_LEVEL_", "");
     }
 
     public string to_json()
@@ -31,8 +32,13 @@ namespace Vls
       }
     }
 
-    public static LogLevel from_json(string? value)
+    public static LogLevel? from_json(string? value)
     {
+      if (value == null)
+      {
+        return null;
+      }
+
       switch (value)
       {
       case "off": return LogLevel.OFF;
@@ -54,7 +60,8 @@ namespace Vls
 
     public string to_string()
     {
-      return ((GLib.EnumClass) typeof(MethodCompletionMode).class_ref()).get_value(this).value_name.replace("VLS_METHOD_COMPLETION_MODE_", "");
+      GLib.EnumValue? value = ((GLib.EnumClass) typeof(MethodCompletionMode).class_ref()).get_value(this);
+      return value == null ? "???" : value.value_name.replace("VLS_METHOD_COMPLETION_MODE_", "");
     }
 
     public string to_json()
@@ -68,9 +75,14 @@ namespace Vls
       }
     }
 
-    public static MethodCompletionMode from_json(string? value)
+    public static MethodCompletionMode? from_json(string? value)
     {
-      switch (value)
+      if (value == null)
+      {
+        return null;
+      }
+
+      switch ((string)value)
       {
       case "off": return MethodCompletionMode.OFF;
       case "space": return MethodCompletionMode.SPACE;
@@ -95,18 +107,12 @@ namespace Vls
     {
       if (pspec.value_type.is_a(typeof(LogLevel)))
       {
-        LogLevel level = property_node.get_node_type() == Json.NodeType.VALUE
-          ? LogLevel.from_json(property_node.get_string())
-          : LogLevel.WARN;
-        @value.set_enum(level);
+        @value.set_enum(LogLevel.from_json(property_node.get_string()) ?? LogLevel.WARN);
         return true;
       }
       else if (pspec.value_type.is_a(typeof(MethodCompletionMode)))
       {
-        MethodCompletionMode mode = property_node.get_node_type() == Json.NodeType.VALUE
-          ? MethodCompletionMode.from_json(property_node.get_string())
-          : MethodCompletionMode.OFF;
-        @value.set_enum(mode);
+        @value.set_enum(MethodCompletionMode.from_json(property_node.get_string()) ?? MethodCompletionMode.OFF);
         return true;
       }
       return base.deserialize_property(property_name, ref @value, pspec, property_node);
@@ -115,9 +121,9 @@ namespace Vls
 
   public class BuildConfig : AbstractJsonSerializableObject
   {
-    public JsonSerializableCollection<string> sources { get; set; }
+    public JsonSerializableCollection<string>? sources { get; set; }
 
-    public string parameters { get; set; }
+    public string? parameters { get; set; }
 
     protected override JsonSerializableCollection? create_collection(string property_name)
     {
@@ -136,7 +142,7 @@ namespace Vls
 
     public string target_type { get; set; } // "type" is not allowed (even with an '@')
 
-    public JsonSerializableCollection<MesonTargetSource> target_sources { get; set; }
+    public JsonSerializableCollection<MesonTargetSource>? target_sources { get; set; }
 
     public override unowned ParamSpec? find_property(string name)
     {
@@ -156,11 +162,11 @@ namespace Vls
 
   public class MesonTargetSource : AbstractJsonSerializableObject
   {
-    public string language { get; set; }
+    public string? language { get; set; }
 
-    public JsonSerializableCollection<string> parameters { get; set; }
+    public JsonSerializableCollection<string>? parameters { get; set; }
 
-    public JsonSerializableCollection<string> sources { get; set; }
+    public JsonSerializableCollection<string>? sources { get; set; }
 
     protected override JsonSerializableCollection? create_collection(string property_name)
     {
@@ -177,6 +183,7 @@ namespace Vls
   public enum LintSeverity
   {
     IGNORE = 0,
+    ACTION,
     HINT,
     INFO,
     WARN,
@@ -184,7 +191,8 @@ namespace Vls
 
     public string to_string()
     {
-      return ((GLib.EnumClass) typeof(LintSeverity).class_ref()).get_value(this).value_name.replace("LINT_SEVERITY_", "");
+      GLib.EnumValue? value = ((GLib.EnumClass) typeof(LintSeverity).class_ref()).get_value(this);
+      return value == null ? "???" : ((GLib.EnumValue)value).value_name.replace("LINT_SEVERITY_", "");
     }
 
     public string to_json()
@@ -192,6 +200,7 @@ namespace Vls
       switch (this)
       {
       case LintSeverity.IGNORE: return "ignore";
+      case LintSeverity.ACTION: return "action";
       case LintSeverity.HINT: return "hint";
       case LintSeverity.INFO: return "info";
       case LintSeverity.WARN: return "warn";
@@ -200,11 +209,17 @@ namespace Vls
       }
     }
 
-    public static LintSeverity from_json(string? value)
+    public static LintSeverity? from_json(string? value)
     {
-      switch (value)
+      if (value == null)
+      {
+        return null;
+      }
+
+      switch ((string)value)
       {
       case "ignore": return LintSeverity.IGNORE;
+      case "action": return LintSeverity.ACTION;
       case "hint": return LintSeverity.HINT;
       case "info": return LintSeverity.INFO;
       case "warn": return LintSeverity.WARN;
@@ -218,6 +233,9 @@ namespace Vls
   {
     public LintSeverity no_implicit_this_access { get; set; default = LintSeverity.IGNORE; }
     public LintSeverity no_unqualified_static_access { get; set; default = LintSeverity.IGNORE; }
+    public LintSeverity no_implicit_non_null_cast { get; set; default = LintSeverity.IGNORE; }
+    public LintSeverity no_type_inference { get; set; default = LintSeverity.IGNORE; }
+    public LintSeverity no_type_inference_unless_evident { get; set; default = LintSeverity.IGNORE; }
 
     public override Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
     {
@@ -228,10 +246,7 @@ namespace Vls
     {
       if (pspec.value_type.is_a(typeof(LintSeverity)))
       {
-        LintSeverity severity = property_node.get_node_type() == Json.NodeType.VALUE
-          ? LintSeverity.from_json(property_node.get_string())
-          : LintSeverity.IGNORE;
-        @value.set_enum(severity);
+        @value.set_enum(LintSeverity.from_json(property_node.get_string()) ?? LintSeverity.IGNORE);
         return true;
       }
       return base.deserialize_property(property_name, ref @value, pspec, property_node);

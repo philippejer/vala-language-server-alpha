@@ -16,14 +16,15 @@ namespace Vls
         return;
       }
 
-      Vala.Symbol symbol = (Vala.Symbol)node;
+      unowned Vala.Symbol symbol = (Vala.Symbol)node;
+      unowned string? symbol_name = symbol.name;
 
-      if (symbol.source_reference == null || is_hidden_symbol(symbol) || symbol.name.has_prefix("_lambda"))
+      if (symbol.source_reference == null || symbol_name == null || is_hidden_symbol(symbol) || symbol_name.has_prefix("_lambda"))
       {
         if (logdebug) debug(@"Symbol ignored: '$(code_node_to_string(symbol))'");
         return;
       }
-      
+
       if (logdebug) debug(@"Found code lens symbol: '$(code_node_to_string(symbol))'");
       symbols.add(symbol);
     }

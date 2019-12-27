@@ -1,4 +1,3 @@
-
 namespace Vls
 {
   /** Flags to control how reachable symbols are filtered for completion. */
@@ -17,25 +16,39 @@ namespace Vls
   /** Returns true if 'node1' is inside 'node2'. */
   public bool code_node_is_inside(Vala.CodeNode node1, Vala.CodeNode node2)
   {
-    return node1.source_reference.begin.pos >= node2.source_reference.begin.pos &&
-           node1.source_reference.end.pos <= node2.source_reference.end.pos;
+    unowned Vala.SourceReference? source_reference1 = node1.source_reference;
+    unowned Vala.SourceReference? source_reference2 = node2.source_reference;
+    if (source_reference1 == null || source_reference2 == null)
+    {
+      return false;
+    }
+    return source_reference1.begin.pos >= source_reference2.begin.pos &&
+      source_reference1.end.pos <= source_reference2.end.pos;
   }
 
   /** Returns true if 'node1' and 'node2' reference the same source. */
   public bool code_node_matches(Vala.CodeNode node1, Vala.CodeNode node2)
   {
-    return node1.source_reference.begin.pos == node2.source_reference.begin.pos &&
-           node1.source_reference.end.pos == node2.source_reference.end.pos;
+    unowned Vala.SourceReference? source_reference1 = node1.source_reference;
+    unowned Vala.SourceReference? source_reference2 = node2.source_reference;
+    if (source_reference1 == null || source_reference2 == null)
+    {
+      return false;
+    }
+    return source_reference1.begin.pos == source_reference2.begin.pos &&
+      source_reference1.end.pos == source_reference2.end.pos;
   }
 
   /** Returns the source code for 'node'. */
   public string get_code_node_source(Vala.CodeNode node)
   {
-    if (node.source_reference == null)
+    unowned Vala.SourceReference? source_reference = node.source_reference;
+    if (source_reference == null)
     {
       return "";
     }
-    return get_source_reference_source(node.source_reference);
+
+    return get_source_reference_source(source_reference);
   }
 
   /** Returns the source code for 'source_reference'. */
@@ -46,16 +59,36 @@ namespace Vls
     return get_string_from_pointers(begin, end);
   }
 
-  /** Extracts the substring between 'begin' and 'end'. */
-  public string get_string_from_pointers(char* begin, char* end)
+  /** Extracts the substring between 'start' and 'end'. */
+  public string get_string_from_pointers(char* start, char* end)
   {
-    return ((string)begin).substring(0, (long)(end - begin));
+    return ((string)start).substring(0, (long)(end - start));
   }
 
-  /** Searches for one of 'tokens' between 'begin' and 'max' ('max' excluded from search). */
-  public char* find_tokens(char* begin, char* max, char[] tokens)
+  public char* find_non_whitespace_position_reverse(char* source, char* min)
   {
-    char* pos = begin;
+    char* pos = source;
+    while (pos >= min && pos[0].isspace() && pos[0] != '\n')
+    {
+      pos -= 1;
+    }
+    return pos >= min ? pos : null;
+  }
+
+  public char* find_non_whitespace_position(char* source, char* max)
+  {
+    char* pos = source;
+    while (pos < max && pos[0].isspace() && pos[0] != '\n')
+    {
+      pos += 1;
+    }
+    return pos < max ? pos : null;
+  }
+
+  /** Searches for one of 'tokens' between 'start' and 'max' ('max' excluded from search). */
+  public char* find_tokens(char* start, char* max, char[] tokens)
+  {
+    char* pos = start;
     while (pos < max)
     {
       if (is_one_of_tokens(pos[0], tokens))
@@ -67,10 +100,10 @@ namespace Vls
     return pos == max ? null : pos;
   }
 
-  /** Searches for 'token' in reverse between 'begin' and 'min' ('min' included in search). */
-  public char* find_token_reverse(char* begin, char* min, char[] tokens)
+  /** Searches for 'token' in reverse between 'start' and 'min' ('min' included in search). */
+  public char* find_token_reverse(char* start, char* min, char[] tokens)
   {
-    char* pos = begin;
+    char* pos = start;
     while (pos >= min)
     {
       if (is_one_of_tokens(pos[0], tokens))
@@ -101,7 +134,8 @@ namespace Vls
     {
       return "null (CodeNode)";
     }
-    var symbol = node as Vala.Symbol;
+
+    unowned Vala.Symbol? symbol = node as Vala.Symbol;
     if (symbol != null)
     {
       return @"name: '$(symbol.name ?? "[unnamed symbol]")', type: '$(node.type_name)', source: '$(source_reference_to_string(node.source_reference))'";
@@ -119,6 +153,7 @@ namespace Vls
     {
       return "NULL (SourceReference)";
     }
+
     return @"$(source_reference.file.filename): $(source_reference.begin.line).$(source_reference.begin.column)::$(source_reference.end.line).$(source_reference.end.column)";
   }
 
@@ -132,18 +167,24 @@ namespace Vls
   }
 
   /** Returns the definition of 'symbol' from the source code (with the parent symbol and comment if any).  */
-  public string get_symbol_definition_code_with_comment(Vala.Symbol symbol)
+  public string? get_symbol_definition_code_with_comment(Vala.Symbol symbol)
   {
-    string code = get_symbol_definition_code(symbol);
+    string? code = get_symbol_definition_code(symbol);
+    if (code == null)
+    {
+      return null;
+    }
 
-    if (symbol.comment != null)
+    unowned Vala.SourceReference? source_reference = symbol.source_reference;
+    unowned Vala.Comment? comment = symbol.comment;
+    if (source_reference != null && comment != null)
     {
       // Backtrack to begin of line for proper alignment of multiline comments
-      char* comment_begin = find_token_reverse(symbol.comment.source_reference.begin.pos, symbol.comment.source_reference.file.get_mapped_contents(), { '\r', '\n' });
-      comment_begin = comment_begin == null ? symbol.comment.source_reference.begin.pos : comment_begin + 1;
+      char* comment_begin = find_token_reverse(comment.source_reference.begin.pos, comment.source_reference.file.get_mapped_contents(), { '\r', '\n' });
+      comment_begin = comment_begin == null ? comment.source_reference.begin.pos : comment_begin + 1;
 
       // The comment source reference end is not valid for some reason (Vala 0.46)
-      string comment_code = get_string_from_pointers(comment_begin, symbol.source_reference.begin.pos);
+      string comment_code = get_string_from_pointers(comment_begin, source_reference.begin.pos);
       code = @"$(comment_code)$(code)";
     }
 
@@ -151,15 +192,23 @@ namespace Vls
   }
 
   /** Returns the definition of 'symbol' from the source code (with the parent symbol for context).  */
-  public string get_symbol_definition_code(Vala.Symbol symbol)
+  public string? get_symbol_definition_code(Vala.Symbol symbol)
   {
-    string source = get_symbol_definition_source(symbol);
-
-    // Add the parent symbol name for context (hack-ish but simple)
-    Vala.Symbol? parent_symbol = symbol.parent_symbol;
-    if (parent_symbol != null && parent_symbol.name != null)
+    string? source = get_symbol_definition_source(symbol);
+    if (source == null)
     {
-      source = @"[$(get_visible_symbol_name(parent_symbol))] $(source)";
+      return null;
+    }
+
+    // Add the parent type or namespace for context
+    unowned Vala.Symbol? parent_symbol = symbol.parent_symbol;
+    if (parent_symbol is Vala.TypeSymbol || parent_symbol is Vala.Namespace)
+    {
+      string? parent_symbol_name = get_visible_symbol_name(parent_symbol);
+      if (parent_symbol_name != null)
+      {
+        source = @"[$(parent_symbol_name)] $(source)";
+      }
     }
 
     // Flatten the string otherwise display is mangled (at least in VSCode)
@@ -169,7 +218,7 @@ namespace Vls
   /** Removes consecutive spaces and replaces newline by space to make a snippet suitable for one-line display (e.g. document outline). */
   public string remove_extra_spaces(string input)
   {
-    var builder = new StringBuilder();
+    StringBuilder builder = new StringBuilder();
     char* data = input.data;
     char last_char = 0;
     while (data[0] != 0)
@@ -190,7 +239,7 @@ namespace Vls
   }
 
   /** Returns the definition of 'symbol' from the source code.  */
-  public string get_symbol_definition_source(Vala.Symbol symbol)
+  public string? get_symbol_definition_source(Vala.Symbol symbol)
   {
     if (symbol is Vala.Subroutine)
     {
@@ -198,29 +247,7 @@ namespace Vls
     }
     else if (symbol is Vala.LocalVariable)
     {
-      Vala.LocalVariable variable = (Vala.LocalVariable)symbol;
-      if (variable.variable_type != null)
-      {
-        if (logdebug) debug(@"Local variable type: '$(code_node_to_string(variable.variable_type))', type symbol: '$(code_node_to_string(variable.variable_type.data_type))'");
-        if (variable.variable_type.data_type != null && variable.variable_type.data_type.name != null)
-        {
-          return variable.variable_type.data_type.name + " " + get_code_node_source(symbol);
-        }
-      }
-      else
-      {
-        if (logdebug) debug(@"Local variable has no type: '$(code_node_to_string(variable.variable_type))'");
-      }
-      return get_code_node_source(symbol);
-    }
-    else if (symbol is Vala.Variable)
-    {
-      Vala.Variable variable = (Vala.Variable)symbol;
-      if (variable.variable_type != null)
-      {
-        if (logdebug) debug(@"Variable: '$(code_node_to_string(variable))', type: '$(code_node_to_string(variable.variable_type))', type symbol: '$(code_node_to_string(variable.variable_type.data_type))'");
-      }
-      return get_code_node_source(symbol);
+      return get_local_variable_definition_source((Vala.LocalVariable)symbol);
     }
     else
     {
@@ -228,25 +255,229 @@ namespace Vls
     }
   }
 
-  /** Returns the source code of 'method' including the parameters (Vala currently does not include the parameters in the source reference). */
-  public string get_method_declaration_source(Vala.Subroutine method)
+  private string get_local_variable_definition_source(Vala.LocalVariable variable)
   {
-    char* begin = method.source_reference.begin.pos;
-    char* max = method.source_reference.file.get_mapped_contents() + method.source_reference.file.get_mapped_length();
-    char* pos = find_text_between_parens(begin, max);
-    pos = pos != null ? find_tokens(pos, max, { '{', ';' }) : null;
-    char* end = pos == null ? method.source_reference.end.pos : pos;
-    return get_string_from_pointers(begin, end);
+    string? type_name = get_type_name(variable, variable.variable_type);
+    if (type_name != null)
+    {
+      if (logdebug) debug(@"Local variable type: '$(type_name)'");
+      return type_name + " " + get_code_node_source(variable);
+    }
+    else
+    {
+      if (logdebug) debug(@"Local variable has no type: '$(code_node_to_string(variable.variable_type))'");
+      return get_code_node_source(variable);
+    }
+  }
+
+  private string? get_type_name(Vala.CodeNode node, Vala.DataType? data_type)
+  {
+    if (data_type == null)
+    {
+      return null;
+    }
+
+    if (data_type is Vala.GenericType)
+    {
+      unowned Vala.GenericType generic_type = ((Vala.GenericType)data_type);
+      return generic_type.type_parameter.name;
+    }
+    else if (data_type is Vala.PointerType)
+    {
+      unowned Vala.DataType base_type = ((Vala.PointerType)data_type).base_type;
+      string? type_name = get_type_symbol_name(node, base_type.data_type);
+      if (type_name == null)
+      {
+        return null;
+      }
+
+      if (base_type.has_type_arguments())
+      {
+        type_name += "<";
+        bool first = true;
+        foreach (Vala.DataType argument_data_type in base_type.get_type_arguments())
+        {
+          string? argument_type_name = get_type_name(node, argument_data_type);
+          if (argument_type_name == null)
+          {
+            return null;
+          }
+
+          if (first)
+          {
+            first = false;
+          }
+          else
+          {
+            type_name += ", ";
+          }
+          type_name += argument_type_name;
+        }
+        type_name += ">";
+      }
+
+      return type_name + "*";
+    }
+    else
+    {
+      string? type_name = get_type_symbol_name(node, data_type.data_type);
+      if (type_name == null)
+      {
+        return null;
+      }
+
+      if (data_type.has_type_arguments())
+      {
+        type_name += "<";
+        bool first = true;
+        foreach (Vala.DataType argument_data_type in data_type.get_type_arguments())
+        {
+          string? argument_type_name = get_type_name(node, argument_data_type);
+          if (argument_type_name == null)
+          {
+            return null;
+          }
+
+          if (first)
+          {
+            first = false;
+          }
+          else
+          {
+            type_name += ", ";
+          }
+          type_name += argument_type_name;
+        }
+        type_name += ">";
+      }
+
+      if (data_type.nullable)
+      {
+        type_name += "?";
+      }
+
+      return type_name;
+    }
+  }
+
+  public string? get_type_symbol_name(Vala.CodeNode node, Vala.TypeSymbol? type_symbol)
+  {
+    if (type_symbol == null)
+    {
+      return null;
+    }
+
+    string? type_symbol_name = type_symbol.name;
+    if (type_symbol_name == null)
+    {
+      return null;
+    }
+
+    unowned Vala.Symbol? parent_symbol = type_symbol.parent_symbol;
+    while (parent_symbol != null)
+    {
+      string? parent_name = parent_symbol.name;
+      if (parent_name == null || symbol_is_visible(node, parent_symbol))
+      {
+        break;
+      }
+      type_symbol_name = @"$(parent_name).$(type_symbol_name)";
+      parent_symbol = parent_symbol.parent_symbol;
+    }
+
+    return type_symbol_name;
+  }
+
+  public bool symbol_is_visible(Vala.CodeNode node, Vala.Symbol symbol)
+  {
+    bool is_namespace = (symbol is Vala.Namespace);
+
+    Vala.CodeNode? parent = get_node_parent(node);
+    while (parent != null)
+    {
+      if (is_namespace)
+      {
+        if ((parent is Vala.Namespace) && ((Vala.Namespace)parent).name == symbol.name)
+        {
+          // Same namespace
+          return true;
+        }
+      }
+      else
+      {
+        if ((parent is Vala.Symbol) && ((Vala.Symbol)parent).name == symbol.name)
+        {
+          // Same outer type
+          return true;
+        }
+      }
+      parent = get_node_parent(parent);
+    }
+
+    if (is_namespace)
+    {
+      unowned Vala.SourceReference? source_reference = node.source_reference;
+      if (source_reference != null)
+      {
+        foreach (Vala.UsingDirective using_directive in source_reference.using_directives)
+        {
+          if (using_directive.namespace_symbol.name == symbol.name)
+          {
+            // Namespace has a using statement
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  public string? get_node_namespace(Vala.CodeNode node)
+  {
+    Vala.CodeNode? parent = get_node_parent(node);
+    while (parent != null)
+    {
+      if (parent is Vala.Namespace)
+      {
+        return ((Vala.Namespace)parent).name;
+      }
+      parent = get_node_parent(parent);
+    }
+    return null;
+  }
+
+  /** Returns the source code of 'method' including the parameters (Vala currently does not include the parameters in the source reference). */
+  public string? get_method_declaration_source(Vala.Subroutine method)
+  {
+    unowned Vala.SourceReference? source_reference = method.source_reference;
+    if (source_reference == null)
+    {
+      return null;
+    }
+
+    char* start = source_reference.begin.pos;
+    char* max = source_reference.file.get_mapped_contents() + source_reference.file.get_mapped_length();
+
+    // Go to the end of the method arguments
+    char* end = find_method_arguments(start, max);
+
+    // Go the end of the method declaration (semicolon) or definition (brace)
+    end = end != null ? find_tokens(end, max, { '{', ';' }) : null;
+    end = end == null ? source_reference.end.pos : end;
+
+    return get_string_from_pointers(start, end);
   }
 
   /**
-   * Searches for a text fragment delimited by parentheses between 'begin' and 'max' ('max' excluded from search).
+   * Searches for the arguments of a method declaration or definition, delimited by parentheses,
+   * between 'start' and 'max' ('max' excluded from search).
    * Returns the position after the last parenthesis.
    */
-  public char* find_text_between_parens(char* begin, char* max)
+  public char* find_method_arguments(char* start, char* max)
   {
+    char* pos = start;
     int num_delimiters = 0;
-    char* pos = begin;
     while (pos < max)
     {
       if (pos[0] == '(')
@@ -273,10 +504,12 @@ namespace Vls
     {
       return null;
     }
+
     if (node is T)
     {
       return (T)node;
     }
+
     Vala.CodeNode? parent = get_node_parent(node);
     return get_node_parent_of_type<T>(parent);
   }
@@ -284,15 +517,16 @@ namespace Vls
   /** Returns 'parent_node' or 'parent_symbol' (second choice) of 'node'. */
   public Vala.CodeNode? get_node_parent(Vala.CodeNode node)
   {
-    Vala.CodeNode? parent = node.parent_node;
+    unowned Vala.CodeNode? parent = node.parent_node;
     if (parent == null)
     {
-      var symbol = node as Vala.Symbol;
+      unowned Vala.Symbol? symbol = node as Vala.Symbol;
       if (symbol != null)
       {
         parent = symbol.parent_symbol;
       }
     }
+
     return parent;
   }
 
@@ -300,11 +534,13 @@ namespace Vls
   public Vala.Symbol? get_symbol_reference(Vala.CodeNode node, bool prefer_override)
   {
     Vala.Symbol? symbol = get_symbol_reference_aux(node, prefer_override);
+
     if (symbol != null && is_hidden_symbol(symbol))
     {
       if (logdebug) debug(@"Symbol is an hidden symbol: '$(code_node_to_string(node))'");
       return null;
     }
+
     return symbol;
   }
 
@@ -313,10 +549,12 @@ namespace Vls
   {
     if (prefer_override && node is Vala.MemberAccess)
     {
-      var expr = (Vala.MemberAccess)node;
-      if (expr.inner != null)
+      unowned Vala.MemberAccess expr = (Vala.MemberAccess)node;
+      unowned Vala.Expression? inner = expr.inner;
+      if (inner != null)
       {
-        Vala.Symbol? inner_type = get_expression_type(expr.inner);
+        bool is_instance;
+        Vala.Symbol? inner_type = get_expression_type(inner, out is_instance);
         if (inner_type != null)
         {
           // Specific case for MemberAccess expressions: search for a more specific definition of the member
@@ -332,8 +570,9 @@ namespace Vls
     }
     if (node is Vala.Expression && !(node is Vala.Literal))
     {
-      var expr = (Vala.Expression)node;
-      if (expr.symbol_reference == null || expr.symbol_reference.source_reference == null)
+      unowned Vala.Expression expr = (Vala.Expression)node;
+      unowned Vala.Symbol? symbol_reference = expr.symbol_reference;
+      if (symbol_reference == null || symbol_reference.source_reference == null)
       {
         if (logsilly) debug(@"Expression has no symbol reference: '$(code_node_to_string(node))'");
       }
@@ -344,14 +583,15 @@ namespace Vls
     }
     else if (node is Vala.MemberInitializer)
     {
-      var init = (Vala.MemberInitializer)node;
-      if (init.symbol_reference == null || init.symbol_reference.source_reference == null)
+      unowned Vala.MemberInitializer initializer = (Vala.MemberInitializer)node;
+      unowned Vala.Symbol? symbol_reference = initializer.symbol_reference;
+      if (symbol_reference == null || symbol_reference.source_reference == null)
       {
         if (logdebug) debug(@"MemberInitializer has no symbol reference: '$(code_node_to_string(node))'");
       }
       else
       {
-        return init.symbol_reference;
+        return symbol_reference;
       }
     }
     else if (node is Vala.DelegateType)
@@ -366,7 +606,7 @@ namespace Vls
     {
       if (!prefer_override && node is Vala.Method)
       {
-        var base_method = ((Vala.Method)node).base_method;
+        unowned Vala.Method? base_method = ((Vala.Method)node).base_method;
         if (base_method != null)
         {
           return base_method;
@@ -380,11 +620,12 @@ namespace Vls
   /** Returns true if the symbol is an hidden compiler-generated symbol. */
   public bool is_hidden_symbol(Vala.Symbol symbol, bool hide_default_constructor = false)
   {
-    return symbol.name == null || (symbol.name.has_prefix(".") && (hide_default_constructor || symbol.name != ".new"));
+    string? name = symbol.name;
+    return name == null || (name.has_prefix(".") && (hide_default_constructor || name != ".new"));
   }
 
   /** Returns true if 'symbol' is an instance member. */
-  public bool symbol_is_instance_member(Vala.Symbol symbol)
+  public bool symbol_is_instance_member(Vala.Symbol? symbol)
   {
     Vala.MemberBinding? binding = get_symbol_member_binding(symbol);
     return binding == Vala.MemberBinding.INSTANCE;
@@ -398,43 +639,50 @@ namespace Vls
   }
 
   /** Returns the member binding type of 'symbol'. */
-  public Vala.MemberBinding? get_symbol_member_binding(Vala.Symbol symbol)
+  public Vala.MemberBinding? get_symbol_member_binding(Vala.Symbol? symbol)
   {
     if (symbol is Vala.Field)
     {
-      var f = (Vala.Field)symbol;
+      unowned Vala.Field f = (Vala.Field)symbol;
       return f.binding;
     }
     else if (symbol is Vala.Method && !(symbol is Vala.CreationMethod))
     {
-      var m = (Vala.Method)symbol;
+      unowned Vala.Method m = (Vala.Method)symbol;
       return m.binding;
     }
     else if (symbol is Vala.Property)
     {
-      var p = (Vala.Property)symbol;
+      unowned Vala.Property p = (Vala.Property)symbol;
       return p.binding;
     }
     return null;
   }
 
-  public bool is_backing_field_symbol(Vala.Symbol symbol)
+  public bool is_backing_field_symbol(Vala.Symbol? symbol)
   {
-    var field = symbol as Vala.Field;
+    unowned Vala.Field? field = symbol as Vala.Field;
     return field != null ? is_backing_field(field) : false;
   }
 
-  public bool is_backing_field(Vala.Field field)
+  public bool is_backing_field(Vala.Field? field)
   {
-    if (field.name != null && field.name.has_prefix("_"))
+    string? field_name = field != null ? field.name : null;
+    if (field == null || field_name == null)
+    {
+      return false;
+    }
+
+    if (field_name.has_prefix("_"))
     {
       // Heuristic to detect compiler-generated field for properties
-      if (field.owner.lookup((string)(&field.name.data[1])) != null)
+      if (field.owner.lookup((string)(&field_name.data[1])) != null)
       {
         if (logdebug) debug(@"Ignoring property-backing field: '$(code_node_to_string(field))'");
         return true;
       }
     }
+
     return false;
   }
 
@@ -445,19 +693,21 @@ namespace Vls
     {
       return result;
     }
-    if (node.source_reference != null && node.source_reference.using_directives != null)
+
+    unowned Vala.SourceReference? source_reference = node.source_reference;
+    if (source_reference == null)
     {
-      foreach (Vala.UsingDirective using_directive in node.source_reference.using_directives)
+      return null;
+    }
+
+    foreach (Vala.UsingDirective using_directive in source_reference.using_directives)
+    {
+      if (probe_symbol_table(using_directive.namespace_symbol, name, flags, ref result))
       {
-        if (using_directive.namespace_symbol != null)
-        {
-          if (probe_symbol_table(using_directive.namespace_symbol, name, flags, ref result))
-          {
-            return result;
-          }
-        }
+        return result;
       }
     }
+
     return null;
   }
 
@@ -471,6 +721,7 @@ namespace Vls
         return true;
       }
     }
+
     Vala.CodeNode? parent_node = get_node_parent(node);
     if (parent_node != null)
     {
@@ -479,6 +730,7 @@ namespace Vls
         return true;
       }
     }
+
     return false;
   }
 
@@ -488,29 +740,30 @@ namespace Vls
     {
       return true;
     }
-    var base_types = get_base_types(symbol);
-    if (base_types != null)
+
+    Gee.ArrayList<Vala.Symbol> base_types = get_base_types(symbol);
+    foreach (Vala.Symbol base_type in base_types)
     {
-      foreach (Vala.Symbol base_type in base_types)
+      if (probe_symbol_table(base_type, name, flags & ~SymbolFlags.PRIVATE, ref result))
       {
-        if (probe_symbol_table(base_type, name, flags & ~SymbolFlags.PRIVATE, ref result))
-        {
-          return true;
-        }
+        return true;
       }
     }
+
     return false;
   }
 
   private bool probe_symbol_table(Vala.Symbol symbol, string name, SymbolFlags flags, ref Vala.Symbol? result)
   {
-    Vala.Map<string, Vala.Symbol> symbol_table = symbol.scope.get_symbol_table();
+    Vala.Map<string, Vala.Symbol>? symbol_table = symbol.scope.get_symbol_table();
     if (symbol_table == null)
     {
       return false;
     }
+
     if (logdebug) debug(@"Check symbol table for symbol: '$(code_node_to_string(symbol))'");
-    Vala.Symbol? scope_symbol = symbol_table[name];
+
+    Vala.Symbol? scope_symbol = symbol_table.get(name);
     if (scope_symbol == null)
     {
       return false;
@@ -519,6 +772,7 @@ namespace Vls
     {
       return false;
     }
+
     result = scope_symbol;
     return true;
   }
@@ -545,14 +799,17 @@ namespace Vls
         return false;
       }
     }
+
     return true;
   }
 
   /** Returns the base types of 'symbol' (recursively). */
   public Gee.ArrayList<Vala.Symbol> get_base_types(Vala.Symbol? symbol)
   {
-    var base_types = new Gee.ArrayList<Vala.Symbol>();
+    Gee.ArrayList<Vala.Symbol> base_types = new Gee.ArrayList<Vala.Symbol>();
+
     add_base_types(symbol, base_types);
+
     return base_types;
   }
 
@@ -563,68 +820,77 @@ namespace Vls
     {
       return;
     }
+
     if (symbol is Vala.Class)
     {
-      Vala.Class class_node = (Vala.Class)symbol;
-      Vala.List<Vala.DataType> base_types = class_node.get_base_types();
+      unowned Vala.Class class_symbol = (Vala.Class)symbol;
+      Vala.List<Vala.DataType> base_types = class_symbol.get_base_types();
       foreach (Vala.DataType base_type in base_types)
       {
-        if (base_type.data_type != null)
+        unowned Vala.TypeSymbol? base_type_symbol = base_type.data_type;
+        if (base_type_symbol != null)
         {
-          base_type_symbols.add(base_type.data_type);
-          add_base_types(base_type.data_type, base_type_symbols);
+          base_type_symbols.add(base_type_symbol);
+          add_base_types(base_type_symbol, base_type_symbols);
         }
       }
     }
     else if (symbol is Vala.Struct)
     {
-      Vala.Struct struct_node = (Vala.Struct)symbol;
-      if (struct_node.base_type != null && struct_node.base_type.data_type != null)
+      unowned Vala.Struct struct_symbol = (Vala.Struct)symbol;
+      unowned Vala.DataType? base_type = struct_symbol.base_type;
+      unowned Vala.TypeSymbol? base_type_symbol = base_type != null ? (Vala.TypeSymbol?)base_type.data_type : null;
+      if (base_type_symbol != null)
       {
-        base_type_symbols.add(struct_node.base_type.data_type);
-        add_base_types(struct_node.base_type.data_type, base_type_symbols);
+        base_type_symbols.add(base_type_symbol);
+        add_base_types(base_type_symbol, base_type_symbols);
       }
     }
     else if (symbol is Vala.Interface)
     {
-      Vala.Interface interface_node = (Vala.Interface)symbol;
-      Vala.List<Vala.DataType> base_types = interface_node.get_prerequisites();
+      unowned Vala.Interface interface_symbol = (Vala.Interface)symbol;
+      Vala.List<Vala.DataType> base_types = interface_symbol.get_prerequisites();
       foreach (Vala.DataType base_type in base_types)
       {
-        if (base_type.data_type != null)
+        unowned Vala.TypeSymbol? base_type_symbol = base_type.data_type;
+        if (base_type_symbol != null)
         {
-          base_type_symbols.add(base_type.data_type);
-          add_base_types(base_type.data_type, base_type_symbols);
+          base_type_symbols.add(base_type_symbol);
+          add_base_types(base_type_symbol, base_type_symbols);
         }
       }
     }
   }
 
-  private Gee.Map<Type, unowned string> symbol_type_names = null;
+  private Gee.Map<Type, unowned string>? symbol_type_readable_names = null;
 
-  public unowned string get_symbol_type_name(Vala.Symbol symbol)
+  public unowned string get_symbol_type_readable_name(Vala.Symbol symbol)
   {
-    if (symbol_type_names == null)
+    Gee.Map<Type, unowned string>? names = symbol_type_readable_names;
+
+    if (names == null)
     {
-      symbol_type_names = new Gee.HashMap<Type, unowned string>();
-      symbol_type_names.set(typeof(Vala.Namespace), "namespace");
-      symbol_type_names.set(typeof(Vala.Parameter), "parameter");
-      symbol_type_names.set(typeof(Vala.LocalVariable), "local variable");
-      symbol_type_names.set(typeof(Vala.Method), "method");
-      symbol_type_names.set(typeof(Vala.Field), "field");
-      symbol_type_names.set(typeof(Vala.Property), "property");
-      symbol_type_names.set(typeof(Vala.Signal), "signal");
-      symbol_type_names.set(typeof(Vala.Constant), "constant");
-      symbol_type_names.set(typeof(Vala.Class), "class");
-      symbol_type_names.set(typeof(Vala.Struct), "struct");
-      symbol_type_names.set(typeof(Vala.Enum), "enum");
-      symbol_type_names.set(typeof(Vala.EnumValue), "enum value");
-      symbol_type_names.set(typeof(Vala.ErrorDomain), "error domain");
-      symbol_type_names.set(typeof(Vala.ErrorCode), "error code");
+      names = new Gee.HashMap<Type, unowned string>();
+      names.set(typeof(Vala.Namespace), "namespace");
+      names.set(typeof(Vala.Parameter), "parameter");
+      names.set(typeof(Vala.LocalVariable), "local variable");
+      names.set(typeof(Vala.Method), "method");
+      names.set(typeof(Vala.Field), "field");
+      names.set(typeof(Vala.Property), "property");
+      names.set(typeof(Vala.Signal), "signal");
+      names.set(typeof(Vala.Constant), "constant");
+      names.set(typeof(Vala.Class), "class");
+      names.set(typeof(Vala.Struct), "struct");
+      names.set(typeof(Vala.Enum), "enum");
+      names.set(typeof(Vala.EnumValue), "enum value");
+      names.set(typeof(Vala.ErrorDomain), "error domain");
+      names.set(typeof(Vala.ErrorCode), "error code");
+      symbol_type_readable_names = names;
     }
+
     Type symbol_type = Type.from_instance(symbol);
-    unowned string name = symbol_type_names[symbol_type];
-    return name ?? symbol_type.name();
+    unowned string? symbol_type_name = names.get(symbol_type);
+    return symbol_type_name ?? symbol_type.name();
   }
 
   /** Returns the ancestor type (root of the class/struct tree) of 'symbol'. */
@@ -649,6 +915,7 @@ namespace Vls
     {
       return ((Vala.Struct)symbol).base_struct;
     }
+
     return null;
   }
 
@@ -656,36 +923,44 @@ namespace Vls
    * Returns the type symbol of the specified expression.
    * Also sets 'is_instance' based on whether the expression denotes an instance of the type or the type itself.
    */
-  public Vala.Symbol? get_expression_type(Vala.Expression expr, out bool? is_instance = null)
+  public Vala.Symbol? get_expression_type(Vala.Expression expression, out bool is_instance)
   {
     is_instance = false;
-    Vala.Symbol? symbol = expr.symbol_reference;
-    if (symbol is Vala.TypeSymbol || symbol is Vala.Namespace)
+
+    unowned Vala.Symbol? symbol_reference = expression.symbol_reference;
+    if (symbol_reference is Vala.TypeSymbol || symbol_reference is Vala.Namespace)
     {
       // Expression references a symbol which is a static type or namespace (not an instance of a type)
-      if (logdebug) debug(@"Expression references static type: '$(code_node_to_string(symbol))'");
-      if (expr is Vala.BaseAccess)
+      if (logdebug) debug(@"Expression references static type: '$(code_node_to_string(symbol_reference))'");
+      if (expression is Vala.BaseAccess)
       {
         // Special case for 'base' access
         is_instance = true;
       }
-      return symbol;
+      return symbol_reference;
     }
-    Vala.Variable? variable = symbol as Vala.Variable;
-    if (variable != null && variable.variable_type != null && variable.variable_type.data_type != null)
+
+    if (symbol_reference is Vala.Variable)
     {
-      // Expression references a symbol which is an instance of a type
-      if (logdebug) debug(@"Expression references a variable: '$(code_node_to_string(variable))'");
-      is_instance = true;
-      return variable.variable_type.data_type;
+      unowned Vala.DataType? variable_type = ((Vala.Variable)symbol_reference).variable_type;
+      if (variable_type != null && ((Vala.TypeSymbol?)variable_type.data_type) != null)
+      {
+        // Expression references a symbol which is an instance of a type
+        if (logdebug) debug(@"Expression references a variable: '$(code_node_to_string(symbol_reference))'");
+        is_instance = true;
+        return variable_type.data_type;
+      }
     }
-    if (expr.value_type != null && expr.value_type.data_type != null)
+
+    unowned Vala.DataType? value_type = expression.value_type;
+    if (value_type != null && ((Vala.TypeSymbol?)value_type.data_type) != null)
     {
       // Expression does not reference a symbol but the compiler has been able to infer its type
-      if (logdebug) debug(@"Expression does not reference a symbol but has a type: '$(code_node_to_string(expr.value_type.data_type))'");
+      if (logdebug) debug(@"Expression does not reference a symbol but has a type: '$(code_node_to_string(value_type.data_type))'");
       is_instance = true;
-      return expr.value_type.data_type;
+      return value_type.data_type;
     }
+
     return null;
   }
 
@@ -733,23 +1008,28 @@ namespace Vls
    */
   public Location? get_symbol_location(Vala.CodeNode node, Vala.Symbol symbol, bool strict) throws Error
   {
-    string symbol_name = get_visible_symbol_name(symbol);
+    string? symbol_name = get_visible_symbol_name(symbol);
     if (symbol_name == null)
     {
       return null;
     }
 
-    if (node.source_reference == null)
+    unowned Vala.SourceReference? source_reference = node.source_reference;
+    if (source_reference == null)
     {
       if (logwarn) warning(@"Node has no source reference: '$(code_node_to_string(node))'");
       return null;
     }
 
-    Location location = source_reference_to_location(node.source_reference);
-    string source = get_code_node_source(node);
-    if (!find_identifier_range(location.range, source, symbol_name))
+    Location location = source_reference_to_location(source_reference);
+
+    // Try to find the identifier in the source and update the location to point to the identifier
+    char* start = source_reference.begin.pos;
+    char* max = source_reference.file.get_mapped_contents() + source_reference.file.get_mapped_length();
+    char* identifier_pos = find_identifier_range(start, max, symbol_name, location.range);
+    if (identifier_pos == null)
     {
-      if (loginfo) info(@"Could not find identifier '$(symbol_name)' in source '$(source)'");
+      if (loginfo) info(@"Could not find identifier '$(symbol_name)' in source of node '$(code_node_to_string(node))'");
       if (strict)
       {
         return null;
@@ -760,58 +1040,65 @@ namespace Vls
   }
 
   /** Retuns the symbol name as it appears in the source code */
-  public string get_visible_symbol_name(Vala.Symbol symbol)
+  public string? get_visible_symbol_name(Vala.Symbol symbol)
   {
-    if (symbol is Vala.CreationMethod)
+    unowned string? symbol_name = symbol.name;
+
+    if (symbol_name != null)
     {
-      if (symbol.name == ".new")
+      if (symbol is Vala.CreationMethod)
       {
-        return ((Vala.CreationMethod)symbol).class_name;
-      }
-      else
-      {
-        return ((Vala.CreationMethod)symbol).class_name + "." + symbol.name;
+        if (symbol_name == ".new")
+        {
+          return ((Vala.CreationMethod)symbol).class_name;
+        }
+        else
+        {
+          return ((Vala.CreationMethod)symbol).class_name + "." + symbol_name;
+        }
       }
     }
-    return symbol.name;
+
+    return symbol_name;
   }
 
   public bool is_package_code_node(Vala.CodeNode node)
   {
-    return node.source_reference != null && node.source_reference.file.file_type == Vala.SourceFileType.PACKAGE;
+    unowned Vala.SourceReference? source_reference = node.source_reference;
+    return source_reference != null && source_reference.file.file_type == Vala.SourceFileType.PACKAGE;
   }
 
   public bool is_source_code_node(Vala.CodeNode node)
   {
-    return node.source_reference != null && node.source_reference.file.file_type == Vala.SourceFileType.SOURCE;
+    unowned Vala.SourceReference? source_reference = node.source_reference;
+    return source_reference != null && source_reference.file.file_type == Vala.SourceFileType.SOURCE;
   }
 
   /**
-   * Searches for 'identifier' as a "whole word" inside 'source' and updates 'range' accordingly if the identifier is found.
-   * Returns true if 'identifier' is found inside 'source'.
+   * Searches for 'identifier' as a "whole word" between 'start' and 'max', updates 'range' accordingly if it is found
+   * and returns a pointer to the identifier.
    */
-  public bool find_identifier_range(Range range, string source, string identifier)
+  public char* find_identifier_range(char* start, char* max, string identifier, Range? range = null)
   {
-    int source_length = source.length;
     int identifier_length = identifier.length;
-    uint line = range.start.line;
-    uint character = range.start.character;
-    int pos = 0;
-    int end = source_length - identifier_length + 1;
-    while (pos < end)
+    uint line = range != null ? range.start.line : 0;
+    uint character = range != null ? range.start.character : 0;
+    char* pos = start;
+    while (pos < max)
     {
-      char prev = source[pos - 1];
-      char next = source[pos + identifier_length];
-      bool is_candidate = (pos == 0 || !is_identifier_char(prev) || prev == '@') && (pos == (end - 1) || !is_identifier_char(next));
-      if (is_candidate && equal_strings((char*)&source.data[pos], (char*)identifier, identifier_length))
+      bool is_candidate = (pos == start || !is_identifier_char(pos[-1]) || pos[-1] == '@') && (pos == (max - 1) || !is_identifier_char(pos[identifier_length]));
+      if (is_candidate && equal_strings(pos, (char*)identifier, identifier_length))
       {
-        range.start.line = line;
-        range.start.character = character;
-        range.end.line = line;
-        range.end.character = character + identifier_length;
-        return true;
+        if (range != null)
+        {
+          range.start.line = line;
+          range.start.character = character;
+          range.end.line = line;
+          range.end.character = character + identifier_length;
+        }
+        return pos;
       }
-      if (source[pos] == '\n')
+      if (pos[0] == '\n')
       {
         line += 1;
         character = 0;
@@ -822,25 +1109,10 @@ namespace Vls
       }
       pos += 1;
     }
-    return false;
+    return null;
   }
 
-  /** Extends 'in_range' into 'ref_range'. */
-  public void extend_ranges(Range ref_range, Range in_range)
-  {
-    if ((ref_range.start.line > in_range.start.line) || (ref_range.start.line == in_range.start.line && ref_range.start.character > in_range.start.character))
-    {
-      ref_range.start.line = in_range.start.line;
-      ref_range.start.character = in_range.start.character;
-    }
-    if ((ref_range.end.line < in_range.end.line) || (ref_range.end.line == in_range.end.line && ref_range.end.character < in_range.end.character))
-    {
-      ref_range.end.line = in_range.end.line;
-      ref_range.end.character = in_range.end.character;
-    }
-  }
-
-  /** Takes a position from VS code (0-based) and returns the corresponding byte offset. */
+  /** Takes a position from VS code (0-based) and returns the byte offset in 'text'. */
   public int get_char_byte_index(string text, uint position_line, uint position_character)
   {
     int index = -1;

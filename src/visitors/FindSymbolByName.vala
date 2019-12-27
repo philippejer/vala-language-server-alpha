@@ -14,8 +14,7 @@ namespace Vls
 
     protected override void check_node_in_file(Vala.CodeNode node)
     {
-      var symbol = node as Vala.Symbol;
-
+      unowned Vala.Symbol? symbol = node as Vala.Symbol;
       if (symbol == null || symbol.name != name)
       {
         return;
