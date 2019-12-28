@@ -1,5 +1,7 @@
 namespace Vls
 {
+  public const string DEFAULT_CONSTRUCTOR_NAME = ".new";
+
   /** Flags to control how reachable symbols are filtered for completion. */
   [Flags]
   public enum SymbolFlags
@@ -65,9 +67,9 @@ namespace Vls
     return ((string)start).substring(0, (long)(end - start));
   }
 
-  public char* find_non_whitespace_position_reverse(char* source, char* min)
+  public char* find_non_whitespace_position_reverse(char* start, char* min)
   {
-    char* pos = source;
+    char* pos = start;
     while (pos >= min && pos[0].isspace() && pos[0] != '\n')
     {
       pos -= 1;
@@ -75,9 +77,9 @@ namespace Vls
     return pos >= min ? pos : null;
   }
 
-  public char* find_non_whitespace_position(char* source, char* max)
+  public char* find_non_whitespace_position(char* start, char* max)
   {
-    char* pos = source;
+    char* pos = start;
     while (pos < max && pos[0].isspace() && pos[0] != '\n')
     {
       pos += 1;
@@ -621,7 +623,7 @@ namespace Vls
   public bool is_hidden_symbol(Vala.Symbol symbol, bool hide_default_constructor = false)
   {
     string? name = symbol.name;
-    return name == null || (name.has_prefix(".") && (hide_default_constructor || name != ".new"));
+    return name == null || (name.has_prefix(".") && (hide_default_constructor || name != DEFAULT_CONSTRUCTOR_NAME));
   }
 
   /** Returns true if 'symbol' is an instance member. */
@@ -1049,7 +1051,7 @@ namespace Vls
     {
       if (symbol is Vala.CreationMethod)
       {
-        if (symbol_name == ".new")
+        if (symbol_name == DEFAULT_CONSTRUCTOR_NAME)
         {
           return ((Vala.CreationMethod)symbol).class_name;
         }
@@ -1140,6 +1142,21 @@ namespace Vls
       }
     }
     return true;
+  }
+
+  public int count_lines(char* start, char* max)
+  {
+    int num_lines = 1;
+    char* pos = start;
+    while (pos < max)
+    {
+      if (pos[0] == '\n')
+      {
+        num_lines += 1;
+      }
+      pos += 1;
+    }
+    return num_lines;
   }
 
   public bool is_identifier_char(char c)
