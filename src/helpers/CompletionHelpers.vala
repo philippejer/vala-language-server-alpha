@@ -561,7 +561,8 @@ namespace Vls
           continue;
         }
 
-        CompletionItemKind kind = get_completion_item_kind(symbol);
+        CompletionItemKind kind = get_completion_item_kind(scope_symbol);
+
         symbols.set(name, new OrderedSymbol()
         {
           name = name,
