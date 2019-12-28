@@ -86,7 +86,7 @@ namespace Vls
             kind = MarkupContent.KIND_MARKDOWN,
             value = @"```vala\n$(code)\n```"
           };
-          completion_item.sortText = "%03d:%s".printf(order, code);
+          completion_item.sortText = "%03d:%s".printf(order, name);
         }
 
         completion_items.add(completion_item);
