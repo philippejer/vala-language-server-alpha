@@ -3,8 +3,10 @@ namespace Vls
   /** A symbol with an order (completion priority, lower is better). */
   public class OrderedSymbol
   {
-    public Vala.Symbol symbol { get; set; }
-    public int order { get; set; }
+    public string name;
+    public CompletionItemKind kind;
+    public Vala.Symbol? symbol;
+    public int order;
   }
 
   public class CompletionHelpers
@@ -30,49 +32,61 @@ namespace Vls
       Gee.MapIterator<string, OrderedSymbol> iter = symbols.map_iterator();
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
-        string name = iter.get_key();
         OrderedSymbol ordered_symbol = iter.get_value();
+        unowned string name = ordered_symbol.name;
+        CompletionItemKind kind = ordered_symbol.kind;
+        unowned Vala.Symbol? symbol = ordered_symbol.symbol;
+        int order = ordered_symbol.order;
 
-        Vala.Symbol symbol = ordered_symbol.symbol;
-        string? code = get_symbol_definition_code(symbol);
-        if (code == null)
+        CompletionItem completion_item = new CompletionItem()
         {
-          break;
-        }
-
-        CompletionItem completion_item = new CompletionItem();
-        completion_item.label = name;
-        completion_item.kind = get_completion_item_kind(symbol);
-        completion_item.documentation = new MarkupContent()
-        {
-          kind = MarkupContent.KIND_MARKDOWN,
-          value = @"```vala\n$(code)\n```"
+          label = name,
+          kind = kind
         };
-        completion_item.sortText = "%03d:%s".printf(ordered_symbol.order, code);
 
-        if (method_completion_mode != MethodCompletionMode.OFF && (symbol is Vala.Callable) && !is_before_paren)
+        if (method_completion_mode != MethodCompletionMode.OFF && !is_before_paren
+          && (kind == CompletionItemKind.Function || kind == CompletionItemKind.Method || kind == CompletionItemKind.Constructor))
         {
-          completion_item.insertTextFormat = InsertTextFormat.Snippet;
           string completion_space = method_completion_mode == MethodCompletionMode.SPACE ? " " : "";
-          Vala.List<Vala.Parameter> parameters = ((Vala.Callable)symbol).get_parameters();
-          if (!parameters.is_empty)
+          if (symbol is Vala.Callable)
           {
-            completion_item.insertText = @"$(name)$(completion_space)($${0})";
-            completion_item.command = new Command()
+            Vala.List<Vala.Parameter> parameters = ((Vala.Callable)symbol).get_parameters();
+            if (!parameters.is_empty)
             {
-              title = "Trigger Parameter Hints",
-              command = "editor.action.triggerParameterHints"
-            };
+              completion_item.insertText = @"$(name)$(completion_space)($${0})";
+              completion_item.command = new Command()
+              {
+                title = "Trigger Parameter Hints",
+                command = "editor.action.triggerParameterHints"
+              };
+            }
+            else
+            {
+              completion_item.insertText = @"$(name)$(completion_space)()";
+            }
+            completion_item.insertTextFormat = InsertTextFormat.Snippet;
           }
           else
           {
-            completion_item.insertText = @"$(name)$(completion_space)()";
+            completion_item.insertText = @"$(name)$(completion_space)(";
+            completion_item.insertTextFormat = InsertTextFormat.PlainText;
           }
         }
         else
         {
           completion_item.insertText = name;
           completion_item.insertTextFormat = InsertTextFormat.PlainText;
+        }
+
+        string? code = symbol != null ? get_symbol_definition_code(symbol) : null;
+        if (code != null)
+        {
+          completion_item.documentation = new MarkupContent()
+          {
+            kind = MarkupContent.KIND_MARKDOWN,
+            value = @"```vala\n$(code)\n```"
+          };
+          completion_item.sortText = "%03d:%s".printf(order, code);
         }
 
         completion_items.add(completion_item);
@@ -157,24 +171,29 @@ namespace Vls
         // Extract the completion expression
         position_index = get_char_byte_index(source_file.content, line, character);
         string completion_expression = extract_completion_expression(source_file.content, position_index);
+
+        // Number of lines in the expression not including leading spaces
+        int num_lines = count_completion_expression_lines(completion_expression);
+        completion_expression = completion_expression.strip();
         if (completion_expression.has_suffix(".") || completion_expression == "")
         {
           completion_expression += completion_wildcard_name;
         }
-        if (loginfo) info(@"Completion expression: '$(completion_expression)'");
 
-        // Comment the incomplete line and insert the variable declaration
-        int line_index = get_char_byte_index(source_file.content, line, 0);
-        int start_index = skip_source_spaces(source_file.content, line_index);
+        if (loginfo) info(@"Completion expression: '$(completion_expression)' (num_lines: $(num_lines))");
+
+        // Comment the incomplete line(s) and insert the variable declaration
+        int start_index = get_char_byte_index(source_file.content, line - num_lines + 1, 0);
+        start_index = skip_source_spaces(source_file.content, start_index);
         int next_line_index = get_char_byte_index(source_file.content, line + 1, 0);
-        string line_str = source_file.content.slice(line_index, next_line_index);
-        string insert_str = @"int $(completion_symbol_name) = $(completion_expression); ";
-        if (line_str.contains("{"))
+        string previous_str = source_file.content.slice(start_index, next_line_index - 1);
+        string completion_str = @"int $(completion_symbol_name) = $(completion_expression);";
+        if (previous_str.contains("{"))
         {
-          insert_str += "{";
+          // Hack to avoid the modified code not compiling because of unbalances braces
+          completion_str += "{";
         }
-        insert_str += "//";
-        source_file.content = source_file.content.splice(start_index, start_index, insert_str);
+        source_file.content = source_file.content.splice(start_index, next_line_index - 1, completion_str);
 
         // Rebuild the syntax tree to compute the completion symbols
         context.check();
@@ -224,7 +243,7 @@ namespace Vls
           {
             num_delimiters -= 1;
           }
-          else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.')
+          else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.' && c != '<' && c != '>')
           {
             // Stop when encountering a non-identifier symbol other than '.' (member access)
             break;
@@ -259,7 +278,29 @@ namespace Vls
         }
         current -= 1;
       }
-      return source.slice(current + 1, index).strip();
+      return source.slice(current + 1, index);
+    }
+
+    private static int count_completion_expression_lines(string expression)
+    {
+      int num_lines = 1;
+      char* pos = (char*)expression;
+      char* end = pos + expression.length;
+      bool found_non_space = false;
+      while (pos < end)
+      {
+        if (!pos[0].isspace() && !found_non_space)
+        {
+          // Ignore leading spaces
+          found_non_space = true;
+        }
+        else if (found_non_space && pos[0] == '\n')
+        {
+          num_lines += 1;
+        }
+        pos += 1;
+      }
+      return num_lines;
     }
 
     public static void test_extract_completion_expression()
@@ -345,7 +386,15 @@ namespace Vls
       if (completion_inner_type == null)
       {
         if (loginfo) info(@"Completion inner expression has no type: '$(code_scope_to_string(completion_inner))'");
-        return null;
+        if (completion_inner.value_type is Vala.ArrayType)
+        {
+          if (loginfo) info(@"Completion inner expression is array type");
+          return get_array_completion_symbols((Vala.ArrayType)completion_inner.value_type);
+        }
+        else
+        {
+          return null;
+        }
       }
       if (loginfo) info(@"Completion inner expression type: '$(is_instance ? "instance" : "class")' ($(code_scope_to_string(completion_inner_type))'");
 
@@ -498,6 +547,7 @@ namespace Vls
       {
         string name = iter.get_key();
         Vala.Symbol scope_symbol = iter.get_value();
+
         if (!is_symbol_compatible_with_flags(scope_symbol, flags))
         {
           continue;
@@ -510,11 +560,41 @@ namespace Vls
         {
           continue;
         }
+
+        CompletionItemKind kind = get_completion_item_kind(symbol);
         symbols.set(name, new OrderedSymbol()
         {
-          symbol = scope_symbol, order = order
+          name = name,
+          kind = kind,
+          symbol = scope_symbol,
+          order = order
         });
       }
+    }
+
+    public static Gee.Map<string, OrderedSymbol> get_array_completion_symbols(Vala.ArrayType array_type)
+    {
+      Gee.HashMap<string, OrderedSymbol> symbols = new Gee.HashMap<string, OrderedSymbol>();
+      add_fake_symbol(symbols, "length", CompletionItemKind.Field);
+      add_fake_symbol(symbols, "copy", CompletionItemKind.Method);
+      add_fake_symbol(symbols, "move", CompletionItemKind.Method);
+      if (array_type.rank == 1)
+      {
+        // Only mono-dimensional arrays can be resized
+        add_fake_symbol(symbols, "resize", CompletionItemKind.Method);
+      }
+      return symbols;
+    }
+
+    private static void add_fake_symbol(Gee.Map<string, OrderedSymbol> symbols, string name, CompletionItemKind kind)
+    {
+      symbols.set(name, new OrderedSymbol()
+      {
+        name = name,
+        kind = kind,
+        symbol = null,
+        order = 0
+      });
     }
 
     /** Returns a verbose repesentation of 'node' (if 'node' is a symbol its children are enumerated). */
@@ -548,12 +628,9 @@ namespace Vls
       builder.append("(");
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
-        Vala.Symbol symbol = iter.get_value().symbol;
-        unowned string? symbol_name = symbol.name;
-        if (symbol_name == null)
-        {
-          break;
-        }
+        OrderedSymbol ordered_symbol = iter.get_value();
+        unowned Vala.Symbol? symbol = ordered_symbol.symbol;
+        unowned string name = ordered_symbol.name;
 
         if (first)
         {
@@ -564,33 +641,36 @@ namespace Vls
           builder.append(", ");
         }
 
-        builder.append(symbol_name);
-        builder.append(" (");
-        if (symbol_is_instance_member(symbol))
+        builder.append(name);
+        if (symbol != null)
         {
-          builder.append("ins");
+          builder.append(" (");
+          if (symbol_is_instance_member(symbol))
+          {
+            builder.append("ins");
+          }
+          else
+          {
+            builder.append("typ");
+          }
+          if (symbol.access == Vala.SymbolAccessibility.PUBLIC)
+          {
+            builder.append("|pub");
+          }
+          else if (symbol.access == Vala.SymbolAccessibility.PROTECTED)
+          {
+            builder.append("|pro");
+          }
+          else if (symbol.access == Vala.SymbolAccessibility.PRIVATE)
+          {
+            builder.append("|pri");
+          }
+          else if (symbol.access == Vala.SymbolAccessibility.INTERNAL)
+          {
+            builder.append("|int");
+          }
+          builder.append(")");
         }
-        else
-        {
-          builder.append("typ");
-        }
-        if (symbol.access == Vala.SymbolAccessibility.PUBLIC)
-        {
-          builder.append("|pub");
-        }
-        else if (symbol.access == Vala.SymbolAccessibility.PROTECTED)
-        {
-          builder.append("|pro");
-        }
-        else if (symbol.access == Vala.SymbolAccessibility.PRIVATE)
-        {
-          builder.append("|pri");
-        }
-        else if (symbol.access == Vala.SymbolAccessibility.INTERNAL)
-        {
-          builder.append("|int");
-        }
-        builder.append(")");
       }
       builder.append(")");
 
@@ -644,21 +724,22 @@ namespace Vls
         return null;
       }
 
-      unowned Vala.Symbol completion_symbol = ordered_symbol.symbol;
-      unowned string? completion_symbol_name = completion_symbol.name;
-      if (completion_symbol_name == null)
+      unowned string name = ordered_symbol.name;
+      unowned Vala.Symbol? symbol = ordered_symbol.symbol;
+      if (symbol == null)
       {
+        // "Fake" symbol (arrays)
         return null;
       }
 
-      unowned Vala.Method? completion_method = completion_symbol as Vala.Method;
-      if (completion_method == null || completion_method.name == null)
+      unowned Vala.Method? method = symbol as Vala.Method;
+      if (method == null)
       {
-        if (logwarn) warning(@"Completion symbol is not a valid method: '$(code_node_to_string(completion_symbol))'");
+        if (logwarn) warning(@"Completion symbol is not a valid method: '$(code_node_to_string(symbol))'");
         return null;
       }
 
-      string? definition_code = get_symbol_definition_code_with_comment(completion_method);
+      string? definition_code = get_symbol_definition_code_with_comment(method);
       if (definition_code == null)
       {
         return null;
@@ -666,7 +747,7 @@ namespace Vls
       if (loginfo) info(@"Found symbol definition code: '$(definition_code)'");
 
       SignatureInformation signature_information = new SignatureInformation();
-      signature_information.label = @"$(completion_symbol_name)()";
+      signature_information.label = @"$(name)()";
       signature_information.documentation = new MarkupContent()
       {
         kind = MarkupContent.KIND_MARKDOWN,

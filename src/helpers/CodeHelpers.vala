@@ -953,12 +953,13 @@ namespace Vls
     }
 
     unowned Vala.DataType? value_type = expression.value_type;
-    if (value_type != null && ((Vala.TypeSymbol?)value_type.data_type) != null)
+    Vala.TypeSymbol? type_symbol = value_type != null ? (Vala.TypeSymbol?)value_type.data_type : null;
+    if (type_symbol != null)
     {
       // Expression does not reference a symbol but the compiler has been able to infer its type
-      if (logdebug) debug(@"Expression does not reference a symbol but has a type: '$(code_node_to_string(value_type.data_type))'");
+      if (logdebug) debug(@"Expression does not reference a symbol but has a type: '$(code_node_to_string(type_symbol))'");
       is_instance = true;
-      return value_type.data_type;
+      return type_symbol;
     }
 
     return null;
