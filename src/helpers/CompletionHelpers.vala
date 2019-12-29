@@ -34,7 +34,7 @@ namespace Vls
       for (bool has_next = iter.next(); has_next; has_next = iter.next())
       {
         OrderedSymbol ordered_symbol = iter.get_value();
-        if (ordered_symbol.symbol is Vala.Class)
+        if (ordered_symbol.kind == CompletionItemKind.Class)
         {
           if (is_creation)
           {
@@ -48,18 +48,12 @@ namespace Vls
             completion_items.add(completion_item);
           }
         }
-        else if (ordered_symbol.symbol is Vala.Struct)
-        {
-          // Suggest both the struct and the constructors
-          CompletionItem completion_item = get_completion_item(ordered_symbol.name, ordered_symbol.kind, ordered_symbol.symbol, ordered_symbol.order, is_before_paren);
-          completion_items.add(completion_item);
-          add_completion_constructors(completion_items, ordered_symbol, is_before_paren);
-        }
         else
         {
           // Default
           CompletionItem completion_item = get_completion_item(ordered_symbol.name, ordered_symbol.kind, ordered_symbol.symbol, ordered_symbol.order, is_before_paren);
           completion_items.add(completion_item);
+          add_completion_constructors(completion_items, ordered_symbol, is_before_paren);
         }
       }
 
@@ -612,9 +606,13 @@ namespace Vls
       {
         return CompletionItemKind.Method;
       }
-      if (symbol is Vala.Class || symbol is Vala.Struct)
+      if (symbol is Vala.Class)
       {
         return CompletionItemKind.Class;
+      }
+      if (symbol is Vala.Struct)
+      {
+        return CompletionItemKind.Struct;
       }
       if (symbol is Vala.Enum || symbol is Vala.ErrorDomain)
       {
@@ -769,17 +767,12 @@ namespace Vls
       }
 
       // Backtrack from the parenthesis to find the method name (hopefully)
-      while (index >= 0 && source[index] != '\n' && !source[index].isalnum() && source[index] != '_')
+      do
       {
         character -= 1;
         index -= 1;
       }
-
-      if (!source[index].isalnum() && source[index] != '_')
-      {
-        if (loginfo) info("Cannot backtrack to method name");
-        return null;
-      }
+      while (index >= 0 && source[index].isspace());
 
       string? completion_member;
       int position_index;
@@ -805,10 +798,25 @@ namespace Vls
         return null;
       }
 
+      // Special case for default constructors
+      Vala.CreationMethod? default_constructor = null;
+      if (is_creation && symbol is Vala.Class)
+      {
+        default_constructor = ((Vala.Class)symbol).default_construction_method;
+      }
+      else if (symbol is Vala.Struct)
+      {
+        default_constructor = ((Vala.Struct)symbol).default_construction_method;
+      }
+      if (default_constructor != null)
+      {
+        symbol = default_constructor;
+      }
+
       unowned Vala.Method? method = symbol as Vala.Method;
       if (method == null)
       {
-        if (logwarn) warning(@"Completion symbol is not a valid method: '$(code_node_to_string(symbol))'");
+        if (loginfo) info(@"Completion symbol is not a valid method: '$(code_node_to_string(symbol))'");
         return null;
       }
 
