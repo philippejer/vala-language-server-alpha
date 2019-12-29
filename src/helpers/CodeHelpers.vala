@@ -1086,8 +1086,7 @@ namespace Vls
     int identifier_length = identifier.length;
     uint line = range != null ? range.start.line : 0;
     uint character = range != null ? range.start.character : 0;
-    char* pos = start;
-    while (pos < max)
+    for (char* pos = start; pos < max; pos++)
     {
       bool is_candidate = (pos == start || !is_identifier_char(pos[-1]) || pos[-1] == '@') && (pos == (max - 1) || !is_identifier_char(pos[identifier_length]));
       if (is_candidate && equal_strings(pos, (char*)identifier, identifier_length))
@@ -1110,7 +1109,6 @@ namespace Vls
       {
         character += 1;
       }
-      pos += 1;
     }
     return null;
   }
@@ -1144,19 +1142,17 @@ namespace Vls
     return true;
   }
 
-  public int count_lines(char* start, char* max)
+  public int count_character_occurrences(char* start, char* max, char c)
   {
-    int num_lines = 1;
-    char* pos = start;
-    while (pos < max)
+    int count = 1;
+    for (char* pos = start; pos < max; pos++)
     {
-      if (pos[0] == '\n')
+      if (pos[0] == c)
       {
-        num_lines += 1;
+        count += 1;
       }
-      pos += 1;
     }
-    return num_lines;
+    return count;
   }
 
   public bool is_identifier_char(char c)

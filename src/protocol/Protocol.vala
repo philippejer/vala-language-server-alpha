@@ -1131,7 +1131,7 @@ namespace Vls
      * The human-readable doc-comment of this parameter. Will be shown
      * in the UI but can be omitted.
      */
-    public string documentation { get; set; }
+    public MarkupContent documentation { get; set; }
   }
 
   public class ReferenceParams : TextDocumentPositionParams

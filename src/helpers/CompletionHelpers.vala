@@ -119,11 +119,58 @@ namespace Vls
         && (kind == CompletionItemKind.Function || kind == CompletionItemKind.Method || kind == CompletionItemKind.Constructor))
       {
         string completion_space = method_completion_mode == MethodCompletionMode.SPACE ? " " : "";
-        if (symbol is Vala.Callable)
+        if (symbol is Vala.Method)
         {
-          Vala.List<Vala.Parameter> parameters = ((Vala.Callable)symbol).get_parameters();
-          if (!parameters.is_empty)
+          Vala.Method method = (Vala.Method)symbol;
+          Vala.List<Vala.Parameter> parameters = method.get_parameters();
+
+          // Check if the method has type parameters
+          Vala.Symbol? parent_symbol = method.parent_symbol;
+          Vala.List<Vala.TypeParameter> type_parameters = null;
+          if (method is Vala.CreationMethod)
           {
+            if (parent_symbol is Vala.Class)
+            {
+              type_parameters = ((Vala.Class)parent_symbol).get_type_parameters();
+            }
+            else if (parent_symbol is Vala.Struct)
+            {
+              type_parameters = ((Vala.Struct)parent_symbol).get_type_parameters();
+            }
+          }
+          //  else
+          //  {
+          //    type_parameters = method.get_type_parameters();
+          //  }
+
+          // If the method has type parameters, suggest them first
+          if (type_parameters != null && !type_parameters.is_empty)
+          {
+            //  string insert_text = @"$(text)<";
+            //  for (int i = 0; i < type_parameters.size; i++)
+            //  {
+            //    Vala.TypeParameter type_parameter = type_parameters[i];
+            //    insert_text += i == type_parameters.size - 1 ? @"$${$(i + 1):$(type_parameter.name)}" : @"$${$(i + 1):$(type_parameter.name)}, ";
+            //  }
+            //  insert_text += @">$(completion_space)$${0}";
+            //  completion_item.insertText = insert_text;
+            completion_item.insertText = @"$(text)<$${0}>";
+            completion_item.command = new Command()
+            {
+              title = "Trigger Parameter Hints",
+              command = "editor.action.triggerParameterHints"
+            };
+          }
+          else if (!parameters.is_empty)
+          {
+            //  string insert_text = @"$(text)$(completion_space)(";
+            //  for (int i = 0; i < parameters.size; i++)
+            //  {
+            //    Vala.Parameter parameter = parameters[i];
+            //    insert_text += i == parameters.size - 1 ? @"$${$(i + 1):$(parameter.name)}" : @"$${$(i + 1):$(parameter.name)}, ";
+            //  }
+            //  insert_text += @")$${0}";
+            //  completion_item.insertText = insert_text;
             completion_item.insertText = @"$(text)$(completion_space)($${0})";
             completion_item.command = new Command()
             {
@@ -197,7 +244,7 @@ namespace Vls
         // Count the number of lines in the expression not including leading whitespace
         // (this is used to determine how many lines to slice below)
         completion_expression = completion_expression.chug();
-        int num_lines = count_lines((char*)completion_expression, (char*)completion_expression + completion_expression.length);
+        int num_lines = count_character_occurrences((char*)completion_expression, (char*)completion_expression + completion_expression.length, '\n');
         completion_expression = completion_expression.chomp();
         if (completion_expression.has_suffix(".") || completion_expression == "")
         {
@@ -213,11 +260,13 @@ namespace Vls
         int next_line_index = get_char_byte_index(source_file.content, line + 1, 0);
         string previous_str = source_file.content.slice(start_index, next_line_index - 1);
         string completion_str = @"int $(completion_symbol_name) = $(completion_expression);";
-        if (previous_str.contains("{"))
+        string after_str = source_file.content.slice(position_index, next_line_index - 1);
+        if (after_str.contains("{"))
         {
           // Hack to avoid the modified source not compiling because of unbalanced braces
           completion_str += "{";
         }
+        debug(@"REPLACE $(previous_str) with $(completion_str)");
         source_file.content = source_file.content.splice(start_index, next_line_index - 1, completion_str);
 
         // Rebuild the syntax tree to compute the completion symbols
@@ -260,16 +309,22 @@ namespace Vls
               current -= 2;
             }
           }
-          else if ((last_non_space_char == '.' || num_delimiters > 0) && (c == ')' || c == ']'))
+          else if ((last_non_space_char == 0 || last_non_space_char == '.' || last_non_space_char == '(') && (c == ')' || c == ']' || c == '>'))
           {
             // Consume any delimited expression inside the inner expression
             num_delimiters += 1;
           }
-          else if (num_delimiters > 0 && (c == '(' || c == '['))
+          else if (num_delimiters > 0 && (c == ')' || c == ']' || c == '>'))
           {
+            // Consume any delimited expression inside the inner expression
+            num_delimiters += 1;
+          }
+          else if (num_delimiters > 0 && (c == '(' || c == '[' || c == '<'))
+          {
+            // Consume any delimited expression inside the inner expression
             num_delimiters -= 1;
           }
-          else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.' && c != '<' && c != '>')
+          else if (num_delimiters == 0 && !c.isspace() && !is_identifier_char(c) && c != '.')
           {
             // Stop when encountering a non-identifier symbol other than '.' (member access)
             break;
@@ -604,7 +659,7 @@ namespace Vls
       }
       if (symbol is Vala.Delegate)
       {
-        return CompletionItemKind.Method;
+        return CompletionItemKind.Interface;
       }
       if (symbol is Vala.Class)
       {
@@ -757,9 +812,9 @@ namespace Vls
       string source = source_file.content;
 
       // Compute the signature help only once (VSCode calls it very often and it is expensive)
-      if (source[index] != '(')
+      if (source[index] != '(' && source[index] != '<')
       {
-        if (source[index] == ')')
+        if (source[index] == ')' || source[index] == '>')
         {
           last_signature_help = null;
         }
@@ -786,7 +841,6 @@ namespace Vls
       OrderedSymbol? ordered_symbol = symbols.get(completion_member);
       if (ordered_symbol == null)
       {
-        if (logwarn) warning(@"Completion member '$(completion_member)' is not in the completion symbols");
         return null;
       }
 
