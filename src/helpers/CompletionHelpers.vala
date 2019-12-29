@@ -124,53 +124,8 @@ namespace Vls
           Vala.Method method = (Vala.Method)symbol;
           Vala.List<Vala.Parameter> parameters = method.get_parameters();
 
-          // Check if the method has type parameters
-          Vala.Symbol? parent_symbol = method.parent_symbol;
-          Vala.List<Vala.TypeParameter> type_parameters = null;
-          if (method is Vala.CreationMethod)
+          if (!parameters.is_empty)
           {
-            if (parent_symbol is Vala.Class)
-            {
-              type_parameters = ((Vala.Class)parent_symbol).get_type_parameters();
-            }
-            else if (parent_symbol is Vala.Struct)
-            {
-              type_parameters = ((Vala.Struct)parent_symbol).get_type_parameters();
-            }
-          }
-          //  else
-          //  {
-          //    type_parameters = method.get_type_parameters();
-          //  }
-
-          // If the method has type parameters, suggest them first
-          if (type_parameters != null && !type_parameters.is_empty)
-          {
-            //  string insert_text = @"$(text)<";
-            //  for (int i = 0; i < type_parameters.size; i++)
-            //  {
-            //    Vala.TypeParameter type_parameter = type_parameters[i];
-            //    insert_text += i == type_parameters.size - 1 ? @"$${$(i + 1):$(type_parameter.name)}" : @"$${$(i + 1):$(type_parameter.name)}, ";
-            //  }
-            //  insert_text += @">$(completion_space)$${0}";
-            //  completion_item.insertText = insert_text;
-            completion_item.insertText = @"$(text)<$${0}>";
-            completion_item.command = new Command()
-            {
-              title = "Trigger Parameter Hints",
-              command = "editor.action.triggerParameterHints"
-            };
-          }
-          else if (!parameters.is_empty)
-          {
-            //  string insert_text = @"$(text)$(completion_space)(";
-            //  for (int i = 0; i < parameters.size; i++)
-            //  {
-            //    Vala.Parameter parameter = parameters[i];
-            //    insert_text += i == parameters.size - 1 ? @"$${$(i + 1):$(parameter.name)}" : @"$${$(i + 1):$(parameter.name)}, ";
-            //  }
-            //  insert_text += @")$${0}";
-            //  completion_item.insertText = insert_text;
             completion_item.insertText = @"$(text)$(completion_space)($${0})";
             completion_item.command = new Command()
             {
@@ -258,7 +213,6 @@ namespace Vls
         int start_index = get_char_byte_index(source_file.content, line - num_lines + 1, 0);
         start_index = skip_source_spaces(source_file.content, start_index);
         int next_line_index = get_char_byte_index(source_file.content, line + 1, 0);
-        string previous_str = source_file.content.slice(start_index, next_line_index - 1);
         string completion_str = @"int $(completion_symbol_name) = $(completion_expression);";
         string after_str = source_file.content.slice(position_index, next_line_index - 1);
         if (after_str.contains("{"))
@@ -266,7 +220,6 @@ namespace Vls
           // Hack to avoid the modified source not compiling because of unbalanced braces
           completion_str += "{";
         }
-        debug(@"REPLACE $(previous_str) with $(completion_str)");
         source_file.content = source_file.content.splice(start_index, next_line_index - 1, completion_str);
 
         // Rebuild the syntax tree to compute the completion symbols
@@ -812,9 +765,9 @@ namespace Vls
       string source = source_file.content;
 
       // Compute the signature help only once (VSCode calls it very often and it is expensive)
-      if (source[index] != '(' && source[index] != '<')
+      if (source[index] != '(')
       {
-        if (source[index] == ')' || source[index] == '>')
+        if (source[index] == ')')
         {
           last_signature_help = null;
         }
@@ -841,6 +794,7 @@ namespace Vls
       OrderedSymbol? ordered_symbol = symbols.get(completion_member);
       if (ordered_symbol == null)
       {
+        if (loginfo) info(@"Completion member '$(completion_member)' is not in the completion symbols");
         return null;
       }
 
