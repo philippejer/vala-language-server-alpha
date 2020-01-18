@@ -1586,22 +1586,24 @@ namespace Vls
       finder.find();
 
       Vala.Symbol? symbol = finder.found_symbol;
-      if (symbol is Vala.Method)
-      {
-        // Get the base method to find every reference
-        Vala.Method? base_method = ((Vala.Method)symbol).base_method;
-        if (base_method != null)
-        {
-          symbol = base_method;
-        }
-      }
       if (symbol == null)
       {
         if (logwarn) warning(@"Could not find code lens symbol, fileuri: '$(fileuri)', start: $(range.start.line).$(range.start.character)");
         return null;
       }
 
-      Gee.ArrayList<Vala.CodeNode> references = find_symbol_references(symbol, false);
+      Vala.Symbol? base_symbol = symbol;
+      if (symbol is Vala.Method)
+      {
+        // Get the base method to find every reference
+        Vala.Method? base_method = ((Vala.Method)symbol).base_method;
+        if (base_method != null)
+        {
+          base_symbol = base_method;
+        }
+      }
+
+      Gee.ArrayList<Vala.CodeNode> references = find_symbol_references(base_symbol, false);
       if (references.size == 0)
       {
         return new Command()
