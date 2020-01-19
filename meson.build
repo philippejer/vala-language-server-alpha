@@ -26,7 +26,6 @@ common_sources = files([
 	'src/helpers/TestHelpers.vala',
 	'src/protocol/Protocol.vala',
 	'src/protocol/JsonSerialization.vala',
-	'src/protocol/JsonSerializable.vapi',
 ])
 
 valac = meson.get_compiler('vala')
@@ -73,10 +72,10 @@ if vala_version.endswith('-exp')
 
 	# Enables the non-null mode with the flag to relax the requirement to cast
 	# when the compiler can statically prove that a variable is non-null
-	add_project_arguments([
-  	'--enable-experimental-non-null',
-  	'--exp-nullable-exemptions',
-	], language: 'vala')
+	# add_project_arguments([
+  # 	'--enable-experimental-non-null',
+  # 	'--exp-nullable-exemptions',
+	# ], language: 'vala')
 endif
 
 add_project_arguments(['--pkg=posix'], language: 'vala')

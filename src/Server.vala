@@ -54,8 +54,8 @@ namespace Vls
       void* new_stdin_handle = Windows._get_osfhandle(new_stdin_fd);
       void* new_stdout_handle = Windows._get_osfhandle(new_stdout_fd);
 #else
-      var new_stdin_fd = Posix.dup(Posix.STDIN_FILENO);
-      var new_stdout_fd = Posix.dup(Posix.STDOUT_FILENO);
+      int new_stdin_fd = Posix.dup(Posix.STDIN_FILENO);
+      int new_stdout_fd = Posix.dup(Posix.STDOUT_FILENO);
       Posix.close(Posix.STDIN_FILENO);
       Posix.dup2(Posix.STDERR_FILENO, Posix.STDOUT_FILENO);
 #endif
@@ -66,8 +66,8 @@ namespace Vls
       Win32InputStream stdin_stream = new Win32InputStream(new_stdin_handle, false);
       Win32OutputStream stdout_stream = new Win32OutputStream(new_stdout_handle, false);
 #else
-      var stdin_stream = new UnixInputStream(new_stdin_fd, false);
-      var stdout_stream = new UnixOutputStream(new_stdout_fd, false);
+      UnixInputStream stdin_stream = new UnixInputStream(new_stdin_fd, false);
+      UnixOutputStream stdout_stream = new UnixOutputStream(new_stdout_fd, false);
 #endif
       SimpleIOStream io_stream = new SimpleIOStream(stdin_stream, stdout_stream);
 
@@ -765,13 +765,16 @@ namespace Vls
 
     private void update_context() throws Error
     {
-      show_elapsed_time("Check context", () => this.reporter = context.check());
+      Reporter? reporter = null;
 
-      unowned Reporter? reporter = this.reporter;
+      show_elapsed_time("Check context", () => reporter = context.check());
+
       if (reporter == null)
       {
         return;
       }
+
+      this.reporter = reporter;
 
       if (update_context_client == null)
       {

@@ -1,13 +1,13 @@
 namespace Vls
 {
-  public class AbstractJsonSerializableObject : GLib.Object, JsonSerializableObject
+  public class AbstractJsonSerializableObject : GLib.Object, Json.Serializable
   {
     protected virtual bool serialize_nulls()
     {
       return false;
     }
 
-    public virtual Json.Node? serialize_property(string property_name, Value value, ParamSpec pspec)
+    public virtual Json.Node serialize_property(string property_name, Value value, ParamSpec pspec)
     {
       // Serialize primitive types explicitly otherwise zero values are ignored for some reason...
       if (pspec.value_type.is_a(typeof(int)))
@@ -43,7 +43,7 @@ namespace Vls
           }
           else
           {
-            return null;
+            return default_serialize_property(property_name, value, pspec);
           }
         }
         else
@@ -55,24 +55,22 @@ namespace Vls
       return default_serialize_property(property_name, value, pspec);
     }
 
-    public virtual bool deserialize_property(string property_name, ref Value value, ParamSpec pspec, Json.Node property_node)
+    public virtual bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(JsonSerializableValue)))
       {
         JsonSerializableValue? json_value = create_value(pspec.value_type, property_name);
-        if (json_value == null)
-        {
-          return false;
-        }
-        if (json_value.deserialize(property_node))
+
+        if (json_value != null && json_value.deserialize(property_node))
         {
           value = Value(pspec.value_type);
           value.set_object(json_value);
+
+          return true;
         }
-        return true;
       }
 
-      return default_deserialize_property(property_name, ref value, pspec, property_node);
+      return default_deserialize_property(property_name, out value, pspec, property_node);
     }
 
     private JsonSerializableValue? create_value(Type value_type, string property_name)

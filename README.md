@@ -36,7 +36,7 @@ Currently it has only been "tested" with a specific setup:
 * Visual Studio Code as the client IDE (other IDEs might work but I have not tested it)
 * The project should be built with Meson 0.50+, as the language server uses Meson introspection to discover the source files and compiler options (this should be fairly common for current Vala projects)
 * If Meson is not available or does not work, it is possible to use a `vala-language-server.json` config file (see above)
-* The language server depends on Vala 0.46+ to parse and analyze the source files (other versions might work but this is the one I use)
+* The language server depends on Vala 0.47+ to parse and analyze the source files (other versions might work but this is the one I use)
 
 I have written a quick step-by-step guide on [how to compile](#how-to-compile) the language server starting from a vanilla Ubuntu distribution (18.04) and the same with MinGW-64 under Windows.
 
@@ -71,35 +71,59 @@ Note that [this branch](https://gitlab.gnome.org/philippejer/vala/tree/0.46.3-ex
 
 The support of this "mode" in the compiler is detected by looking at the compiler version (see [meson.build](https://github.com/philippejer/vala-language-server-alpha/blob/master/meson.build)).
 
-## How to compile (Ubuntu 18.04)
+## How to compile (tested with Ubuntu 18.04 WSL)
 
 Quick steps on how to compile and setup everything (tested with Ubuntu 18.04).
 
-### Compile Valac
+### Install dependencies
 
-* Install required build packages
-  * `sudo apt-get install build-essential cmake autoconf autoconf-archive automake libtool flex bison libgraphviz-dev libgee-0.8-dev libjsonrpc-glib-1.0-dev`
-* Download the pre-compiled Vala sources
-  * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.3.tar.xz' && tar xf vala-0.46.3.tar.xz`
-* Compile Valac
-  * `cd vala-0.46.3 && ./configure && make`
-* Install Valac (under `/usr/local`)
-  * `sudo make install`
-* Check the installation
-  * `valac --version` (requires `/usr/local/bin` on `PATH`)
-* For some reason I have had to rebuild the dynamic library cache once
-  * `sudo rm -f /etc/ld.so.cache ; sudo ldconfig`
+* Add the Vala Team PPA to your software sources (https://wiki.gnome.org/Projects/Vala/ValaOnLinux)
+  * `sudo add-apt-repository ppa:vala-team`
+  * `sudo apt-get update`
+* Install required packages
+  * `sudo apt-get install build-essential gdb cmake autoconf autoconf-archive automake libtool flex bison libgraphviz-dev libglib2.0-dev libgee-0.8-dev gobject-introspection libgirepository1.0-dev python3 python3-pip python3-setuptools python3-wheel ninja-build`
 
 ### Install Meson
 
 Vversion 0.50+ is required by the language server for build file introspection (but it is also possible to use a plain `vala-language-server.json` file as explained above).
 
-* Install Python
-  * `sudo apt-get install python3 python3-pip python3-setuptools python3-wheel ninja-build`
 * Install Meson
   * `sudo pip3 install meson`
 * Check Meson installation
-  * `meson --version` (currently using 0.51.2)
+  * `meson --version` (current version is 0.53.0)
+
+### Compile and Install Vala
+
+* Download the pre-compiled Vala sources
+  * `wget 'https://download.gnome.org/sources/vala/0.47/vala-0.47.2.tar.xz' && tar xf vala-0.47.2.tar.xz`
+* Compile Valac
+  * `cd vala-0.47.2 && ./configure && make`
+* Install Valac (under `/usr/local`)
+  * `sudo make install`
+* Check the installation
+  * `valac --version` (requires `/usr/local/bin` on `PATH`)
+* For some reason I generally have to rebuild the dynamic library cache (under WSL)
+  * `sudo rm -f /etc/ld.so.cache ; sudo ldconfig`
+
+### Compile and Install json-glib
+
+Important: the latest version of this library (as of 2019-01-14) is required to compile the language server (see [this commit](https://gitlab.gnome.org/GNOME/json-glib/commit/f2c5b4e2fec975b798ff5dba553c15ffc69b9d82) for more info).
+
+* Checkout the repository
+  * `git clone 'https://gitlab.gnome.org/GNOME/json-glib.git'`
+  * `cd json-glib && git checkout f2c5b4e2fec975b798ff5dba553c15ffc69b9d82`
+* Build and install locally
+  * `meson build --buildtype=release && ninja -C build`
+  * `sudo ninja -C build install`
+
+### Compile and Install jsonrpc-glib (optional)
+
+* Checkout the repository
+  * `git clone 'https://gitlab.gnome.org/GNOME/jsonrpc-glib.git'`
+  * `cd jsonrpc-glib && git checkout 3.34.0`
+* Build and install locally
+  * `meson build --buildtype=release && ninja -C build`
+  * `sudo ninja -C build install`
 
 ### Compile the language server
 
@@ -121,37 +145,50 @@ The general steps are quite similar with MinGW-64 (this is actually my main setu
   * `pacman -Syuu`
 * Install some required build packages (some may not be strictly necessary for Vala)
   * `pacman -S base-devel`
-  * `pacman -S vim mingw-w64-x86_64-toolchain mingw-w64-x86_64-make mingw-w64-x86_64-cmake`
-
-### Compile Valac
-
-Note: you can skip this step by installing the recently updated vala compiler (0.46.3) from the package repository (`pacman -S mingw-w64-x86_64-vala`)
-
-* Download the pre-compiled Vala sources
-  * `wget 'http://download.gnome.org/sources/vala/0.46/vala-0.46.3.tar.xz' && tar xf vala-0.46.3.tar.xz`
-* Compile Valac
-  * `cd vala-0.46.3 && ./configure && make`
-* Install Valac
-  * `make install`
-* Workaround for some bug in libtool (presumably) which puts one DLL in the wrong directory
-  * `mv /mingw64/lib/bin/libvalaccodegen.dll /mingw64/bin/ && rmdir /mingw64/lib/bin`
+  * `pacman -S vim mingw-w64-x86_64-toolchain mingw-w64-x86_64-make mingw-w64-x86_64-cmake mingw-w64-x86_64-python3-pip mingw-w64-x86_64-glib2 mingw-w64-x86_64-jsonrpc-glib mingw-w64-x86_64-libgee`
 
 ### Install Meson
 
 Vversion 0.50+ is required by the language server for build file introspection (but it is also possible to use a plain `vala-language-server.json` file as explained above).
 
-* Install Python
-  * `pacman -S mingw-w64-x86_64-python3-pip`
 * Install Meson
   * `pip3 install meson`
 * Check Meson installation
   * `meson --version` (currently using 0.52.0)
 
+### Compile and Install Valac
+
+* Download the pre-compiled Vala sources
+  * `wget 'https://download.gnome.org/sources/vala/0.47/vala-0.47.2.tar.xz' && tar xf vala-0.47.2.tar.xz`
+* Compile Valac
+  * `cd vala-0.47.2 && ./configure && make`
+* Install Valac
+  * `make install`
+* Workaround for some bug in libtool (presumably) which puts one DLL in the wrong directory
+  * `mv /mingw64/lib/bin/libvalaccodegen.dll /mingw64/bin/ && rmdir /mingw64/lib/bin`
+
+### Compile and Install json-glib
+
+Important: the latest version of this library (as of 2019-01-14) is required to compile the language server (see [this commit](https://gitlab.gnome.org/GNOME/json-glib/commit/f2c5b4e2fec975b798ff5dba553c15ffc69b9d82) for more info).
+
+* Checkout the repository
+  * `git clone 'https://gitlab.gnome.org/GNOME/json-glib.git'`
+  * `cd json-glib && git checkout f2c5b4e2fec975b798ff5dba553c15ffc69b9d82`
+* Build and install locally
+  * `meson --buildtype plain -Ddocs=true -Dman=true build && ninja -C build`
+  * `DESTDIR=/mingw64 ninja -C build install`
+
+### Compile and Install jsonrpc-glib (optional)
+
+* Checkout the repository
+  * `git clone 'https://gitlab.gnome.org/GNOME/jsonrpc-glib.git'`
+  * `cd jsonrpc-glib && git checkout 3.34.0`
+* Build and install locally
+  * `meson --buildtype plain -Denable_tests=false -Dwith_introspection=true -Denable_gtk_doc=false build && ninja -C build`
+  * `DESTDIR=/mingw64 ninja -C build install`
+
 ### Compile the language server
 
-* Installed required dependencies
-  * `pacman -S mingw-w64-x86_64-glib2 mingw-w64-x86_64-jsonrpc-glib mingw-w64-x86_64-libgee`
-* Note: for some time the JSON-RPC package [did not come with the VAPI](https://github.com/msys2/MINGW-packages/issues/5860), this is fixed as of version 3.34.0-3.
 * Clone the repo
   * `git clone 'https://github.com/philippejer/vala-language-server-alpha.git'`
 * Build

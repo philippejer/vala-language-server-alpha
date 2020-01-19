@@ -98,24 +98,26 @@ namespace Vls
     public MethodCompletionMode methodCompletionMode { get; set; default = MethodCompletionMode.OFF; }
     public bool referencesCodeLensEnabled { get; set; default = false; }
 
-    public override Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
+    public override Json.Node serialize_property(string property_name, Value value, ParamSpec pspec)
     {
       error("Not supported");
     }
 
-    public override bool deserialize_property(string property_name, ref Value @value, ParamSpec pspec, Json.Node property_node)
+    public override bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(LogLevel)))
       {
-        @value.set_enum(LogLevel.from_json(property_node.get_string()) ?? LogLevel.WARN);
+        value = Value(pspec.value_type);
+        value.set_enum(LogLevel.from_json(property_node.get_string()) ?? LogLevel.WARN);
         return true;
       }
       else if (pspec.value_type.is_a(typeof(MethodCompletionMode)))
       {
-        @value.set_enum(MethodCompletionMode.from_json(property_node.get_string()) ?? MethodCompletionMode.OFF);
+        value = Value(pspec.value_type);
+        value.set_enum(MethodCompletionMode.from_json(property_node.get_string()) ?? MethodCompletionMode.OFF);
         return true;
       }
-      return base.deserialize_property(property_name, ref @value, pspec, property_node);
+      return base.deserialize_property(property_name, out value, pspec, property_node);
     }
   }
 
@@ -136,7 +138,7 @@ namespace Vls
     }
   }
 
-  public class MesonTarget : AbstractJsonSerializableObject, JsonSerializableObject
+  public class MesonTarget : AbstractJsonSerializableObject, Json.Serializable
   {
     public string name { get; set; }
 
@@ -237,19 +239,20 @@ namespace Vls
     public LintSeverity no_type_inference { get; set; default = LintSeverity.IGNORE; }
     public LintSeverity no_type_inference_unless_evident { get; set; default = LintSeverity.IGNORE; }
 
-    public override Json.Node? serialize_property(string property_name, Value @value, ParamSpec pspec)
+    public override Json.Node serialize_property(string property_name, Value value, ParamSpec pspec)
     {
       error("Not supported");
     }
 
-    public override bool deserialize_property(string property_name, ref Value @value, ParamSpec pspec, Json.Node property_node)
+    public override bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(LintSeverity)))
       {
-        @value.set_enum(LintSeverity.from_json(property_node.get_string()) ?? LintSeverity.IGNORE);
+        value = Value(pspec.value_type);
+        value.set_enum(LintSeverity.from_json(property_node.get_string()) ?? LintSeverity.IGNORE);
         return true;
       }
-      return base.deserialize_property(property_name, ref @value, pspec, property_node);
+      return base.deserialize_property(property_name, out value, pspec, property_node);
     }
   }
 }

@@ -287,7 +287,7 @@ namespace Vls
     else if (data_type is Vala.PointerType)
     {
       unowned Vala.DataType base_type = ((Vala.PointerType)data_type).base_type;
-      string? type_name = get_type_symbol_name(node, base_type.data_type);
+      string? type_name = get_type_symbol_name(node, base_type.type_symbol);
       if (type_name == null)
       {
         return null;
@@ -322,7 +322,7 @@ namespace Vls
     }
     else
     {
-      string? type_name = get_type_symbol_name(node, data_type.data_type);
+      string? type_name = get_type_symbol_name(node, data_type.type_symbol);
       if (type_name == null)
       {
         return null;
@@ -602,7 +602,7 @@ namespace Vls
     }
     else if (node is Vala.DataType)
     {
-      return ((Vala.DataType)node).data_type;
+      return ((Vala.DataType)node).type_symbol;
     }
     else if (node is Vala.Symbol)
     {
@@ -829,7 +829,7 @@ namespace Vls
       Vala.List<Vala.DataType> base_types = class_symbol.get_base_types();
       foreach (Vala.DataType base_type in base_types)
       {
-        unowned Vala.TypeSymbol? base_type_symbol = base_type.data_type;
+        unowned Vala.TypeSymbol? base_type_symbol = base_type.type_symbol;
         if (base_type_symbol != null)
         {
           base_type_symbols.add(base_type_symbol);
@@ -841,7 +841,7 @@ namespace Vls
     {
       unowned Vala.Struct struct_symbol = (Vala.Struct)symbol;
       unowned Vala.DataType? base_type = struct_symbol.base_type;
-      unowned Vala.TypeSymbol? base_type_symbol = base_type != null ? (Vala.TypeSymbol?)base_type.data_type : null;
+      unowned Vala.TypeSymbol? base_type_symbol = base_type != null ? (Vala.TypeSymbol?)base_type.type_symbol : null;
       if (base_type_symbol != null)
       {
         base_type_symbols.add(base_type_symbol);
@@ -854,7 +854,7 @@ namespace Vls
       Vala.List<Vala.DataType> base_types = interface_symbol.get_prerequisites();
       foreach (Vala.DataType base_type in base_types)
       {
-        unowned Vala.TypeSymbol? base_type_symbol = base_type.data_type;
+        unowned Vala.TypeSymbol? base_type_symbol = base_type.type_symbol;
         if (base_type_symbol != null)
         {
           base_type_symbols.add(base_type_symbol);
@@ -945,17 +945,17 @@ namespace Vls
     if (symbol_reference is Vala.Variable)
     {
       unowned Vala.DataType? variable_type = ((Vala.Variable)symbol_reference).variable_type;
-      if (variable_type != null && ((Vala.TypeSymbol?)variable_type.data_type) != null)
+      if (variable_type != null && ((Vala.TypeSymbol?)variable_type.type_symbol) != null)
       {
         // Expression references a symbol which is an instance of a type
         if (logdebug) debug(@"Expression references a variable: '$(code_node_to_string(symbol_reference))'");
         is_instance = true;
-        return variable_type.data_type;
+        return variable_type.type_symbol;
       }
     }
 
     unowned Vala.DataType? value_type = expression.value_type;
-    Vala.TypeSymbol? type_symbol = value_type != null ? (Vala.TypeSymbol?)value_type.data_type : null;
+    Vala.TypeSymbol? type_symbol = value_type != null ? (Vala.TypeSymbol?)value_type.type_symbol : null;
     if (type_symbol != null)
     {
       // Expression does not reference a symbol but the compiler has been able to infer its type
