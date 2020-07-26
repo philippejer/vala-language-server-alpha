@@ -61,10 +61,10 @@ namespace Vls
       FileUtils.get_contents(filename, out content);
     }
 
-    public void set_vala_source_file(Vala.SourceFile vala_source_file)
+    public void update_vala_file(Vala.SourceFile vala_file)
     {
-      this.vala_file = vala_source_file;
-      vala_source_file.content = content;
+      vala_file.content = content;
+      this.vala_file = vala_file;
     }
   }
 
@@ -193,24 +193,7 @@ namespace Vls
       build_target.active = true;
     }
 
-    public void clear()
-    {
-      if (code_context != null)
-      {
-        Vala.CodeContext.pop();
-        code_context = null;
-      }
-
-      defines.clear();
-      packages.clear();
-      vapi_directories.clear();
-      source_files.clear();
-      active_source_files.clear();
-      build_targets.clear();
-      external_target.clear();
-    }
-
-    public Reporter check() throws Error
+    public Reporter check(bool minimal = true) throws Error
     {
       if (this.code_context != null)
       {
@@ -225,7 +208,7 @@ namespace Vls
       reporter.enable_warnings = !disable_warnings;
       code_context.report = reporter;
 
-      build_context(code_context);
+      show_elapsed_time("Build context", () => build(code_context), true);
 
       if (reporter.get_errors() > 0)
       {
@@ -233,22 +216,26 @@ namespace Vls
       }
 
       Vala.Parser vala_parser = new Vala.Parser();
-      vala_parser.parse(code_context);
+      show_elapsed_time("Parse Vala", () => vala_parser.parse(code_context), true);
 
       Vala.Genie.Parser genie_parser = new Vala.Genie.Parser();
-      genie_parser.parse(code_context);
+      show_elapsed_time("Parse Genie", () => genie_parser.parse(code_context), true);
 
       if (reporter.get_errors() > 0)
       {
         return reporter;
       }
 
-      code_context.check();
+#if LIBVALA_EXP
+      show_elapsed_time(minimal ? "Check context (no flow analysis)" : "Check context (full)", () => code_context.check_(minimal), true);
+#else
+      show_elapsed_time("Context.check() -> code_context.check()", () => code_context.check(), true);
+#endif
 
       return reporter;
     }
 
-    private void build_context(Vala.CodeContext context) throws Error
+    private void build(Vala.CodeContext context) throws Error
     {
       context.experimental_non_null = experimental_non_null;
 
@@ -268,20 +255,22 @@ namespace Vls
       context.exp_resilient_parser = true;
 #endif
 
+#if VALA_0_50
+      context.set_target_profile (Vala.Profile.GOBJECT, true);
+      context.set_target_glib_version("2.56");
+#else
       context.profile = Vala.Profile.GOBJECT;
       context.add_define("GOBJECT");
+      context.add_external_package("glib-2.0");
+      context.add_external_package("gobject-2.0");
+#endif
 
       foreach (string define in defines)
       {
         context.add_define(define);
       }
 
-      context.set_target_glib_version("2.56");
-
       context.vapi_directories = vapi_directories.to_array();
-
-      context.add_external_package("glib-2.0");
-      context.add_external_package("gobject-2.0");
 
       foreach (string package in packages)
       {
@@ -295,9 +284,11 @@ namespace Vls
       {
         if (!build_target.active)
         {
+          if (loginfo) info(@"Build target is inactive: $(build_target.name)");
           continue;
         }
 
+        if (loginfo) info(@"Build target is active: $(build_target.name)");
         foreach (SourceFile source_file in build_target.get_source_files())
         {
           // The source file may have already been added if it is part of several targets
@@ -314,7 +305,7 @@ namespace Vls
       foreach (Vala.SourceFile vala_source_file in context.get_source_files())
       {
         unowned string filename = vala_source_file.filename;
-        string fileuri = sanitize_file_uri(Filename.to_uri(filename));
+        string fileuri = sanitize_file_name(filename);
 
         SourceFile? source_file = get_source_file(fileuri);
 
@@ -332,8 +323,24 @@ namespace Vls
           add_active_source_file(source_file);
         }
 
-        source_file.set_vala_source_file(vala_source_file);
+        source_file.update_vala_file(vala_source_file);
       }
+    }
+
+    public void clear()
+    {
+      if (code_context != null)
+      {
+        Vala.CodeContext.pop();
+        code_context = null;
+      }
+      defines.clear();
+      packages.clear();
+      vapi_directories.clear();
+      source_files.clear();
+      active_source_files.clear();
+      build_targets.clear();
+      external_target.clear();
     }
   }
 }

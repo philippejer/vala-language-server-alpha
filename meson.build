@@ -35,12 +35,12 @@ vala_version = run_command('valac', '--version').stdout(). strip()
 libvala_version = run_command('valac', '--api-version').stdout().strip()
 
 common_dependencies = [
-	dependency('glib-2.0', version: '>=2.54'),
+	dependency('glib-2.0', version: '>=2.56'),
 	dependency('gobject-2.0'),
 	dependency('gee-0.8'),
 	dependency('gio-2.0'),
 	dependency('jsonrpc-glib-1.0'),
-	dependency('libvala-@0@'.format(libvala_version))
+	dependency('libvala-@0@'.format(libvala_version), version: '>=0.48'),
 ]
 
 if host_machine.system() == 'windows'
@@ -72,10 +72,10 @@ if vala_version.endswith('-exp')
 
 	# Enables the non-null mode with the flag to relax the requirement to cast
 	# when the compiler can statically prove that a variable is non-null
-	# add_project_arguments([
-  # 	'--enable-experimental-non-null',
-  # 	'--exp-nullable-exemptions',
-	# ], language: 'vala')
+	add_project_arguments([
+  	'--enable-experimental-non-null',
+  	'--exp-nullable-exemptions',
+	], language: 'vala')
 endif
 
 add_project_arguments(['--pkg=posix'], language: 'vala')

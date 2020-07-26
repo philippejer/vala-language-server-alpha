@@ -483,4 +483,25 @@ namespace Vls
       return true;
     }
   }
+
+  public Json.Node parse_json_file(string filename) throws Error
+  {
+    Json.Parser parser = new Json.Parser.immutable_new();
+    parser.load_from_file(filename);
+    Json.Node? root = parser.get_root();
+    if (root == null)
+    {
+      throw new VlsError.FAILED(@"Unexpected error (root is null)");
+    }
+    return root;
+  }
+
+  public string print_json(Json.Node root, bool is_pretty = true) throws Error
+  {
+    Json.Generator generator = new Json.Generator();
+    generator.set_pretty(is_pretty);
+    generator.set_root(root);
+    size_t length;
+    return generator.to_data(out length);
+  }
 }

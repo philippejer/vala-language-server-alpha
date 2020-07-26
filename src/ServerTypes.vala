@@ -97,11 +97,7 @@ namespace Vls
     public LogLevel logLevel { get; set; default = LogLevel.WARN; }
     public MethodCompletionMode methodCompletionMode { get; set; default = MethodCompletionMode.OFF; }
     public bool referencesCodeLensEnabled { get; set; default = false; }
-
-    public override Json.Node serialize_property(string property_name, Value value, ParamSpec pspec)
-    {
-      error("Not supported");
-    }
+    public bool minimalCodeCheckEnabled { get; set; default = false; }
 
     public override bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
     {

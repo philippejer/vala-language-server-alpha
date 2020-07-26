@@ -2,12 +2,12 @@ namespace Vls
 {
   public class SourceError
   {
-    public Vala.SourceReference source;
+    public Vala.SourceReference source_reference;
     public string message;
 
-    public SourceError(Vala.SourceReference source, string message)
+    public SourceError(Vala.SourceReference source_reference, string message)
     {
-      this.source = source;
+      this.source_reference = source_reference;
       this.message = message;
     }
   }
@@ -18,97 +18,98 @@ namespace Vls
     public Gee.HashMap<string, Gee.ArrayList<SourceError>> warnings_by_file = new Gee.HashMap<string, Gee.ArrayList<SourceError>>();
     public Gee.HashMap<string, Gee.ArrayList<SourceError>> notes_by_file = new Gee.HashMap<string, Gee.ArrayList<SourceError>>();
 
-    public override void note(Vala.SourceReference? source, string message)
+    public override void note(Vala.SourceReference? source_reference, string message)
     {
       if (!enable_warnings)
       {
         return;
       }
-      else if (source == null)
+      else if (source_reference == null)
       {
-        if (logwarn) GLib.warning(@"Non-source note: '$(message)'");
+        if (loginfo) GLib.info(@"Non-source note: '$(message)'");
       }
       else
       {
-        add_source_error(source, "Note: " + message, ref notes_by_file);
+        add_source_error(source_reference, "Note: " + message, ref notes_by_file);
       }
     }
 
-    public override void depr(Vala.SourceReference? source, string message)
-    {
-      if (!enable_warnings)
-      {
-        return;
-      }
-      ++warnings;
-      if (source == null)
-      {
-        if (logwarn) GLib.warning(@"Non-source deprecation: '$(message)'");
-      }
-      else
-      {
-        add_source_error(source, "Deprecated: " + message, ref notes_by_file);
-      }
-    }
-
-    public override void warn(Vala.SourceReference? source, string message)
+    public override void depr(Vala.SourceReference? source_reference, string message)
     {
       if (!enable_warnings)
       {
         return;
       }
       ++warnings;
-      if (source == null)
+      if (source_reference == null)
       {
-        if (logwarn) GLib.warning(@"Non-source warning: '$(message)'");
+        if (loginfo) GLib.info(@"Non-source deprecation: '$(message)'");
       }
       else
       {
-        add_source_error(source, "Warning: " + message, ref warnings_by_file);
+        add_source_error(source_reference, "Deprecated: " + message, ref notes_by_file);
       }
     }
 
-    public override void err(Vala.SourceReference? source, string message)
+    public override void warn(Vala.SourceReference? source_reference, string message)
+    {
+      if (!enable_warnings)
+      {
+        return;
+      }
+      ++warnings;
+      if (source_reference == null)
+      {
+        if (loginfo) GLib.info(@"Non-source warning: '$(message)'");
+      }
+      else
+      {
+        add_source_error(source_reference, "Warning: " + message, ref warnings_by_file);
+      }
+    }
+
+    public override void err(Vala.SourceReference? source_reference, string message)
     {
       ++errors;
-      if (source == null)
+      if (source_reference == null)
       {
-        if (logwarn) GLib.warning(@"Non-source error: '$(message)'");
+        if (loginfo) GLib.info(@"Error without source reference: '$(message)'");
       }
       else
       {
-        add_source_error(source, "Error: " + message, ref errors_by_file);
+        add_source_error(source_reference, "Error: " + message, ref errors_by_file);
       }
     }
 
 #if LIBVALA_EXP
-    public override void suppr_err(Vala.SourceReference? source, string message)
+    public override void suppr_err(Vala.SourceReference? source_reference, string message)
     {
       ++suppr_errors;
-      if (source == null)
+      if (source_reference == null)
       {
-        if (logwarn) GLib.warning(@"Non-source error: '$(message)'");
+        if (loginfo) GLib.info(@"Error without source reference: '$(message)'");
       }
       else
       {
-        add_source_error(source, "Suppressed error: " + message, ref errors_by_file);
+        add_source_error(source_reference, "Suppressed error: " + message, ref errors_by_file);
       }
     }
 #endif
 
-    private static void add_source_error(Vala.SourceReference source, string message, ref Gee.HashMap<string, Gee.ArrayList<SourceError>> errors_by_file)
+    private static void add_source_error(Vala.SourceReference source_reference, string message, ref Gee.HashMap<string, Gee.ArrayList<SourceError>> errors_by_file)
     {
+      string fileuri = sanitize_file_name(source_reference.file.filename);
       Gee.ArrayList<SourceError> errors;
-      if (!errors_by_file.has_key(source.file.filename))
+      if (!errors_by_file.has_key(fileuri))
       {
         errors = new Gee.ArrayList<SourceError>();
-        errors_by_file.set(source.file.filename, errors);
+        errors_by_file.set(fileuri, errors);
       }
       else
       {
-        errors = errors_by_file.get(source.file.filename);
+        errors = errors_by_file.get(fileuri);
       }
-      errors.add(new SourceError(source, message));
+      errors.add(new SourceError(source_reference, message));
     }
   }
 }

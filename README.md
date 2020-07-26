@@ -1,4 +1,6 @@
-# Basic Language Server for Vala
+# Basic Language Server for Vala (deprecated)
+
+**Note**: this project is very loosely maintained, please use and contribute to [this project](https://github.com/benwaffle/vala-language-server) which is actively developed. See paragraph below for more details on the state of Vala language servers.
 
 ## About the state of Vala Language Servers (2019-11-27)
 
@@ -53,6 +55,20 @@ The following features work reasonably well (for my requirements anyway):
 * Find references / symbol rename (rename support is limited, use with care)
 * Code completion (crude and hack-ish but still fairly fast and usable in common situations)
 
+## Terminal popup issue under Windows / MSYS2-MinGW-64
+
+It is likely that you'll have some annoying terminal popup issues under Windows / MSYS2-MinGW-64.
+
+A recent bugfix in the Vala compiler (https://gitlab.gnome.org/GNOME/vala/blob/2ad4a6e8a6c7bf6b2a9fd5d825ad639c420df489/vala/valasourcefile.vala) has had the side effect that the Vala compiler will now properly check the package versions (this is apparently used to check for things like deprecated APIs in VAPIs etc.).
+
+The problem under MSYS2-MinGW-64 is that this requires a call to the shell with `g_spawn ()` and since the language server is apparently seen by GLib as a UI application (as launched by VSCode anyway), GLib uses a "helper" to open a terminal and get the output of the command, which leads to these annoying terminal popups.
+
+For now, my quick-and-dirty solution is to replace the non-console version of the helper with the console version of the helper with something like this (the call to the shell by the Vala compiler will still work for some reason):
+
+`cp /mingw64/bin/gspawn-win64-helper.exe /mingw64/bin/gspawn-win64-helper.exe.bak && cp /mingw64/bin/gspawn-win64-helper-console.exe /mingw64/bin/gspawn-win64-helper.exe`
+
+WARNING: this will probably many uses of `g_spawn ()` (not really sure, I mostly use MSYS2 for Vala development currently). Maybe playing with the `PATH` variable when starting the language server from the IDE would allow to do this properly (?).
+
 ## Limitations and known bugs
 
 * If the Vala parser cannot parse the code (syntax error), code navigation will not work. For semantic errors, it does work, only the syntax needs to be correct. Note that I have made a compiler fork with a few experimental switches, in particular to allow the parser to ignore trivial syntax errors like missing semicolons (see below).
@@ -71,7 +87,7 @@ Note that [this branch](https://gitlab.gnome.org/philippejer/vala/tree/0.46.3-ex
 
 The support of this "mode" in the compiler is detected by looking at the compiler version (see [meson.build](https://github.com/philippejer/vala-language-server-alpha/blob/master/meson.build)).
 
-## How to compile (tested with Ubuntu 18.04 WSL)
+## How to compile for Linux (tested with Ubuntu 18.04 WSL)
 
 Quick steps on how to compile and setup everything (tested with Ubuntu 18.04).
 
@@ -90,33 +106,33 @@ Vversion 0.50+ is required by the language server for build file introspection (
 * Install Meson
   * `sudo pip3 install meson`
 * Check Meson installation
-  * `meson --version` (current version is 0.53.0)
+  * `meson --version` (current version is 0.54.3)
 
-### Compile and Install Vala
+### Compile and install Vala from source
 
 * Download the pre-compiled Vala sources
-  * `wget 'https://download.gnome.org/sources/vala/0.47/vala-0.47.2.tar.xz' && tar xf vala-0.47.2.tar.xz`
+  * `wget 'https://download.gnome.org/sources/vala/0.48/vala-0.48.6.tar.xz' && tar xf vala-0.48.6.tar.xz`
 * Compile Valac
-  * `cd vala-0.47.2 && ./configure && make`
-* Install Valac (under `/usr/local`)
+  * `cd vala-0.48.6 && ./configure && make`
+* Install Valac (under `/usr/local` unless you have specified another prefix in the configure step)
   * `sudo make install`
+* I generally have to rebuild the loader cache (under WSL at least)
+  * `sudo rm -f /etc/ld.so.cache && sudo ldconfig`
 * Check the installation
   * `valac --version` (requires `/usr/local/bin` on `PATH`)
-* For some reason I generally have to rebuild the dynamic library cache (under WSL)
-  * `sudo rm -f /etc/ld.so.cache ; sudo ldconfig`
 
-### Compile and Install json-glib
+  ### Compile and install json-glib
 
-Important: the latest version of this library (as of 2019-01-14) is required to compile the language server (see [this commit](https://gitlab.gnome.org/GNOME/json-glib/commit/f2c5b4e2fec975b798ff5dba553c15ffc69b9d82) for more info).
+Important: a recent master branch of this library (after 2020-01-14) is required to compile the language server (see [this commit](https://gitlab.gnome.org/GNOME/json-glib/commit/f2c5b4e2fec975b798ff5dba553c15ffc69b9d82) for more info).
 
 * Checkout the repository
   * `git clone 'https://gitlab.gnome.org/GNOME/json-glib.git'`
-  * `cd json-glib && git checkout f2c5b4e2fec975b798ff5dba553c15ffc69b9d82`
+  * `cd json-glib && git checkout 761de0f50a9954392ede2337c55e59adb28df97e`
 * Build and install locally
-  * `meson build --buildtype=release && ninja -C build`
-  * `sudo ninja -C build install`
+  * `meson --buildtype plain -Ddocs=true -Dman=true build && ninja -C build`
+  * `DESTDIR=/mingw64 ninja -C build install`
 
-### Compile and Install jsonrpc-glib (optional)
+### Compile and install jsonrpc-glib
 
 * Checkout the repository
   * `git clone 'https://gitlab.gnome.org/GNOME/jsonrpc-glib.git'`
@@ -134,51 +150,53 @@ Important: the latest version of this library (as of 2019-01-14) is required to 
 * Copy the language server on the `PATH` somewhere (or configure the extension to point to it)
   * `cp build/vala-language-server /usr/local/bin`
 
-## How to compile (MinGW-64)
+## How to compile for Windows (MSYS2-MinGW-64)
 
-The general steps are quite similar with MinGW-64 (this is actually my main setup).
+The general steps are quite similar with MSYS2-MinGW-64 (this is actually my main setup).
 
-### Install MinGW-64
+### Install MSYS2-MinGW-64
 
 * Download from https://sourceforge.net/projects/msys2/files/Base/x86_64/
 * Repeat the general update until there is nothing left to update (as explained in the [MSYS2 installation Wiki](https://sourceforge.net/p/msys2/wiki/MSYS2%20installation/))
   * `pacman -Syuu`
 * Install some required build packages (some may not be strictly necessary for Vala)
   * `pacman -S base-devel`
-  * `pacman -S vim mingw-w64-x86_64-toolchain mingw-w64-x86_64-make mingw-w64-x86_64-cmake mingw-w64-x86_64-python3-pip mingw-w64-x86_64-glib2 mingw-w64-x86_64-jsonrpc-glib mingw-w64-x86_64-libgee`
+  * `pacman -S vim mingw-w64-x86_64-toolchain mingw-w64-x86_64-make mingw-w64-x86_64-cmake mingw-w64-x86_64-python3-pip mingw-w64-x86_64-glib2 mingw-w64-x86_64-libgee mingw-w64-x86_64-vala`
 
 ### Install Meson
 
-Vversion 0.50+ is required by the language server for build file introspection (but it is also possible to use a plain `vala-language-server.json` file as explained above).
+Vversion 0.50+ is required by the language server for build file introspection (there is also a fallback possible to use a plain `vala-language-server.json` file as explained above).
 
 * Install Meson
   * `pip3 install meson`
 * Check Meson installation
-  * `meson --version` (currently using 0.52.0)
+  * `meson --version` (current version is 0.54.3)
 
-### Compile and Install Valac
+### Compile and install Vala from source (optional)
+
+This is only useful if the current Vala compiler provided by the package is too out-of-date (currently version 0.48.6 is already provided).
 
 * Download the pre-compiled Vala sources
-  * `wget 'https://download.gnome.org/sources/vala/0.47/vala-0.47.2.tar.xz' && tar xf vala-0.47.2.tar.xz`
+  * `wget 'https://download.gnome.org/sources/vala/0.48/vala-0.48.6.tar.xz' && tar xf vala-0.48.6.tar.xz`
 * Compile Valac
-  * `cd vala-0.47.2 && ./configure && make`
+  * `cd vala-0.48.6 && ./configure && make`
 * Install Valac
   * `make install`
 * Workaround for some bug in libtool (presumably) which puts one DLL in the wrong directory
   * `mv /mingw64/lib/bin/libvalaccodegen.dll /mingw64/bin/ && rmdir /mingw64/lib/bin`
 
-### Compile and Install json-glib
+### Compile and install json-glib
 
-Important: the latest version of this library (as of 2019-01-14) is required to compile the language server (see [this commit](https://gitlab.gnome.org/GNOME/json-glib/commit/f2c5b4e2fec975b798ff5dba553c15ffc69b9d82) for more info).
+Important: a recent master branch of this library (after 2020-01-14) is required to compile the language server (see [this commit](https://gitlab.gnome.org/GNOME/json-glib/commit/f2c5b4e2fec975b798ff5dba553c15ffc69b9d82) for more info).
 
 * Checkout the repository
   * `git clone 'https://gitlab.gnome.org/GNOME/json-glib.git'`
-  * `cd json-glib && git checkout f2c5b4e2fec975b798ff5dba553c15ffc69b9d82`
+  * `cd json-glib && git checkout 761de0f50a9954392ede2337c55e59adb28df97e`
 * Build and install locally
   * `meson --buildtype plain -Ddocs=true -Dman=true build && ninja -C build`
   * `DESTDIR=/mingw64 ninja -C build install`
 
-### Compile and Install jsonrpc-glib (optional)
+### Compile and install jsonrpc-glib
 
 * Checkout the repository
   * `git clone 'https://gitlab.gnome.org/GNOME/jsonrpc-glib.git'`

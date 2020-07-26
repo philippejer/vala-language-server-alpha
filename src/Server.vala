@@ -7,16 +7,18 @@ namespace Vls
   public bool logwarn = false;
   public MethodCompletionMode method_completion_mode = MethodCompletionMode.OFF;
   public bool references_code_lens_enabled = false;
+  public bool minimal_code_check_enabled = false;
 
-  public void update_server_config(ServerConfig config)
+  public void update_server_config(ServerConfig config) throws Error
   {
-    if (loginfo) info(@"Update server config");
+    if (loginfo) info(@"Update server config: $(print_json(Json.gobject_serialize(config)))");
     loglevel = config.logLevel;
     logdebug = (loglevel >= LogLevel.DEBUG);
     loginfo = (loglevel >= LogLevel.INFO);
     logwarn = (loglevel >= LogLevel.WARN);
     method_completion_mode = config.methodCompletionMode;
     references_code_lens_enabled = config.referencesCodeLensEnabled;
+    minimal_code_check_enabled = config.minimalCodeCheckEnabled;
   }
 
   public class Server
@@ -26,6 +28,7 @@ namespace Vls
     const int64 update_context_delay_max_us = 1000 * 1000;
     const uint wait_context_update_delay_ms = 1000;
     const int monitor_file_period_ms = 2500;
+    const int64 process_client_requests_delay_us = 1000 * 1000;
 
     internal static Server? server = null;
     internal static Context context = new Context();
@@ -516,7 +519,7 @@ namespace Vls
       }
       else if (is_source_file(filepath))
       {
-        string fileuri = sanitize_file_uri(Filename.to_uri(filepath));
+        string fileuri = sanitize_file_name(filepath);
         SourceFile? source_file = context.get_source_file(fileuri);
         if (source_file == null)
         {
@@ -738,28 +741,45 @@ namespace Vls
     {
       ServerConfig server_config = variant_to_object<ServerConfig>(@params);
       update_server_config(server_config);
+      request_update_context();
     }
 
-    private int update_context_requests = 0;
     private Jsonrpc.Client? update_context_client = null;
-    private int64 update_context_time_us = 0;
+    private int update_context_requests = 0;
+    private int64 next_update_context_time_us = 0;
+    private int64 last_update_context_time_us = 0;
 
-    private void request_update_context(Jsonrpc.Client client)
+    private void request_update_context(Jsonrpc.Client? client = null)
     {
-      update_context_client = client;
+      if (client != null)
+      {
+        update_context_client = client;
+      }
+      else if (update_context_client == null)
+      {
+        error("No client, this should never happen");
+      }
       update_context_requests += 1;
       int64 delay_us = int64.min(update_context_delay_inc_us * update_context_requests, update_context_delay_max_us);
-      update_context_time_us = get_time_us() + delay_us;
-      if (logdebug) debug(@"Context update (re-)scheduled in $((int) (delay_us / 1000)) ms");
+      next_update_context_time_us = get_time_us() + delay_us;
+      if (loginfo) info(@"Context update (re-)scheduled in $((int) (delay_us / 1000)) ms");
     }
 
     private void check_update_context() throws Error
     {
-      if (update_context_requests > 0 && get_time_us() >= update_context_time_us)
+      int64 current_time_us = get_time_us();
+      if (update_context_requests > 0 && current_time_us >= next_update_context_time_us)
       {
         update_context_requests = 0;
-        update_context_time_us = 0;
+        next_update_context_time_us = 0;
         update_context();
+      }
+      else if (update_context_requests == 0)
+      {
+        if (current_time_us >= last_update_context_time_us + process_client_requests_delay_us)
+        {
+          process_client_requests();
+        }
       }
     }
 
@@ -767,7 +787,7 @@ namespace Vls
     {
       Reporter? reporter = null;
 
-      show_elapsed_time("Check context", () => reporter = context.check());
+      show_elapsed_time("Check context (total)", () => reporter = context.check(minimal_code_check_enabled));
 
       if (reporter == null)
       {
@@ -785,7 +805,7 @@ namespace Vls
       {
         JsonArrayList<Diagnostic> diagnostics = new JsonArrayList<Diagnostic>();
 
-        Gee.Collection<SourceError>? errors = reporter.errors_by_file.get(source_file.filename);
+        Gee.Collection<SourceError>? errors = reporter.errors_by_file.get(source_file.fileuri);
         if (errors != null)
         {
           foreach (SourceError error in errors)
@@ -795,7 +815,7 @@ namespace Vls
           }
         }
 
-        Gee.Collection<SourceError>? warnings = reporter.warnings_by_file.get(source_file.filename);
+        Gee.Collection<SourceError>? warnings = reporter.warnings_by_file.get(source_file.fileuri);
         if (warnings != null)
         {
           foreach (SourceError error in warnings)
@@ -805,7 +825,7 @@ namespace Vls
           }
         }
 
-        Gee.Collection<SourceError>? notes = reporter.notes_by_file.get(source_file.filename);
+        Gee.Collection<SourceError>? notes = reporter.notes_by_file.get(source_file.fileuri);
         if (notes != null)
         {
           foreach (SourceError error in notes)
@@ -843,27 +863,26 @@ namespace Vls
           send_notification_async(update_context_client, "textDocument/publishDiagnostics", object_to_variant(diagnostics_params));
         }
       }
+
+      last_update_context_time_us = get_time_us();
     }
 
-    private class RequestId
+    private delegate void ClientRequestCallbackFunc(bool request_cancelled) throws Error;
+
+    private class ClientRequestId
     {
-      private int64? int_value;
-      private string str_value;
+      private int64? id_int;
+      private string id_str;
 
-      public RequestId(Variant id) throws Error
-      {
-        set_value(id);
-      }
-
-      public void set_value(Variant id) throws Error
+      public ClientRequestId(Variant id) throws Error
       {
         if (id.is_of_type(VariantType.INT64))
         {
-          int_value = id.get_int64();
+          id_int = id.get_int64();
         }
         else if (id.is_of_type(VariantType.STRING))
         {
-          str_value = id.get_string();
+          id_str = id.get_string();
         }
         else
         {
@@ -871,45 +890,57 @@ namespace Vls
         }
       }
 
-      public static uint hash(RequestId a)
+      public static uint hash(ClientRequestId a)
       {
-        if (a.int_value != null)
+        if (a.id_int != null)
         {
-          return int64_hash(a.int_value);
+          return int64_hash(a.id_int);
         }
         else
         {
-          return str_hash(a.str_value);
+          return str_hash(a.id_str);
         }
       }
 
-      public static bool equal(RequestId a, RequestId b)
+      public static bool equal(ClientRequestId a, ClientRequestId b)
       {
-        if (a.int_value != null)
+        if (a.id_int != null)
         {
-          return a.int_value == b.int_value;
+          return a.id_int == b.id_int;
         }
         else
         {
-          return a.str_value == b.str_value;
+          return a.id_str == b.id_str;
         }
       }
 
       public string to_string()
       {
-        int64? int_value = this.int_value;
-        if (int_value != null)
+        int64? id_int = this.id_int;
+        if (id_int != null)
         {
-          return int_value.to_string();
+          return id_int.to_string();
         }
         else
         {
-          return str_value;
+          return id_str;
         }
       }
     }
 
-    private Gee.HashSet<RequestId> pending_requests = new Gee.HashSet<RequestId>(RequestId.hash, RequestId.equal);
+    private class ClientRequest
+    {
+      public ClientRequestId id;
+      public ClientRequestCallbackFunc callback;
+
+      public ClientRequest(ClientRequestId id, owned ClientRequestCallbackFunc callback) throws Error
+      {
+        this.id = id;
+        this.callback = (owned) callback;
+      }
+    }
+
+    private Gee.HashMap<ClientRequestId, ClientRequest> client_requests = new Gee.HashMap<ClientRequestId, ClientRequest>(ClientRequestId.hash, ClientRequestId.equal);
 
     private void on_cancelRequest(Jsonrpc.Client client, Variant @params) throws Error
     {
@@ -920,82 +951,50 @@ namespace Vls
         return;
       }
 
-      RequestId request_id = new RequestId(id);
-      bool removed = pending_requests.remove(request_id);
+      ClientRequestId request_id = new ClientRequestId(id);
+      ClientRequest request;
+      bool removed = client_requests.unset(request_id, out request);
       if (removed)
       {
-        if (loginfo) info(@"Request ($(request_id)): removed cancelled request from pending requests");
+        if (loginfo) info(@"Request ($(request_id)): cancelled request removed");
+        request.callback(true);
       }
       else
       {
-        if (loginfo) info(@"Request ($(request_id)): cancelled request not found in pending requests");
+        if (loginfo) info(@"Request ($(request_id)): cancelled request not found (may have been already processed)");
       }
     }
 
-    private delegate void OnContextUpdatedFunc(bool request_cancelled) throws Error;
-
-    private void wait_context_update(Variant id, owned OnContextUpdatedFunc on_context_updated) throws Error
+    private void wait_context_update(Variant id, owned ClientRequestCallbackFunc callback) throws Error
     {
       if (update_context_requests == 0)
       {
-        on_context_updated(false);
+        callback(false);
         return;
       }
 
-      RequestId request_id = new RequestId(id);
-      bool added = pending_requests.add(request_id);
-      if (!added)
+      ClientRequestId request_id = new ClientRequestId(id);
+      ClientRequest request = new ClientRequest(request_id, (owned) callback);
+      if (!client_requests.has_key(request_id))
       {
-        if (logwarn) warning(@"Request ($(request_id)): request already in pending requests, this should not happen");
+        client_requests.set(request_id, request);
+        if (loginfo) info(@"Request ($(request_id)): add request");
       }
       else
       {
-        if (loginfo) info(@"Request ($(request_id)): added request to pending requests");
+        if (logwarn) warning(@"Request ($(request_id)): request already added, this should not happen");
       }
-
-      wait_context_update_aux(request_id, (owned)on_context_updated);
     }
 
-    private void wait_context_update_aux(RequestId request_id, owned OnContextUpdatedFunc on_context_updated) throws Error
+    private void process_client_requests() throws Error
     {
-      if (update_context_requests == 0)
+      Gee.MapIterator<ClientRequestId, ClientRequest> iterator = client_requests.map_iterator();
+      while (iterator.next())
       {
-        bool removed = pending_requests.remove(request_id);
-        if (!removed)
-        {
-          if (loginfo) info(@"Request ($(request_id)): context updated but cancelled");
-          on_context_updated(true);
-        }
-        else
-        {
-          if (loginfo) info(@"Request ($(request_id)): context updated");
-          on_context_updated(false);
-        }
-      }
-      else
-      {
-        if (loginfo) info(@"Request ($(request_id)): waiting $(wait_context_update_delay_ms) ms for context update");
-        Timeout.add(wait_context_update_delay_ms, () =>
-        {
-          try
-          {
-            if (pending_requests.contains(request_id))
-            {
-              wait_context_update_aux(request_id, (owned)on_context_updated);
-            }
-            else
-            {
-              if (loginfo) info(@"Request ($(request_id)): cancelled before context update");
-              on_context_updated(true);
-            }
-          }
-          catch (Error err)
-          {
-            error(@"Unexpected error: '$(err.message)'");
-          }
-
-          return false;
-        });
+        ClientRequest request = iterator.get_value();
+        if (loginfo) info(@"Request ($(request.id)): process request");
+        request.callback(false);
+        iterator.unset();
       }
     }
 
@@ -1595,7 +1594,7 @@ namespace Vls
         return null;
       }
 
-      Vala.Symbol? base_symbol = symbol;
+      Vala.Symbol base_symbol = symbol;
       if (symbol is Vala.Method)
       {
         // Get the base method to find every reference
@@ -1698,18 +1697,6 @@ namespace Vls
       }
     }
 
-    private static Json.Node parse_json_file(string filename) throws Error
-    {
-      Json.Parser parser = new Json.Parser.immutable_new();
-      parser.load_from_file(filename);
-      Json.Node? root = parser.get_root();
-      if (root == null)
-      {
-        throw new VlsError.FAILED(@"Unexpected error (root is null)");
-      }
-      return root;
-    }
-
     private static bool is_source_file(string filename)
     {
       return filename.has_suffix(".vala") || filename.has_suffix(".gs") || filename.has_suffix(".vapi") || filename.has_suffix(".gir");
@@ -1745,7 +1732,6 @@ namespace Vls
         }
 
         context.activate_build_target(build_target);
-
         update_context();
       }
 

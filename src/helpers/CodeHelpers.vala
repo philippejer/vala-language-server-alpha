@@ -999,7 +999,7 @@ namespace Vls
   {
     return new Diagnostic()
     {
-      range = source_reference_to_range(error.source),
+      range = source_reference_to_range(error.source_reference),
       severity = severity,
       message = error.message
     };
