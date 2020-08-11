@@ -25,6 +25,7 @@ common_sources = files([
 	'src/helpers/MiscHelpers.vala',
 	'src/helpers/TestHelpers.vala',
 	'src/protocol/Protocol.vala',
+	'src/protocol/JsonSerializable.vapi',
 	'src/protocol/JsonSerialization.vala',
 ])
 

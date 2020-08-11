@@ -99,7 +99,7 @@ namespace Vls
     public bool referencesCodeLensEnabled { get; set; default = false; }
     public bool minimalCodeCheckEnabled { get; set; default = false; }
 
-    public override bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
+    public override bool deserialize_property(string property_name, ref Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(LogLevel)))
       {
@@ -113,7 +113,7 @@ namespace Vls
         value.set_enum(MethodCompletionMode.from_json(property_node.get_string()) ?? MethodCompletionMode.OFF);
         return true;
       }
-      return base.deserialize_property(property_name, out value, pspec, property_node);
+      return base.deserialize_property(property_name, ref value, pspec, property_node);
     }
   }
 
@@ -134,7 +134,7 @@ namespace Vls
     }
   }
 
-  public class MesonTarget : AbstractJsonSerializableObject, Json.Serializable
+  public class MesonTarget : AbstractJsonSerializableObject, JsonSerializableObject
   {
     public string name { get; set; }
 
@@ -235,12 +235,12 @@ namespace Vls
     public LintSeverity no_type_inference { get; set; default = LintSeverity.IGNORE; }
     public LintSeverity no_type_inference_unless_evident { get; set; default = LintSeverity.IGNORE; }
 
-    public override Json.Node serialize_property(string property_name, Value value, ParamSpec pspec)
+    public override Json.Node? serialize_property(string property_name, Value value, ParamSpec pspec)
     {
       error("Not supported");
     }
 
-    public override bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
+    public override bool deserialize_property(string property_name, ref Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(LintSeverity)))
       {
@@ -248,7 +248,7 @@ namespace Vls
         value.set_enum(LintSeverity.from_json(property_node.get_string()) ?? LintSeverity.IGNORE);
         return true;
       }
-      return base.deserialize_property(property_name, out value, pspec, property_node);
+      return base.deserialize_property(property_name, ref value, pspec, property_node);
     }
   }
 }

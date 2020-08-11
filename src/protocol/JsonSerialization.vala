@@ -1,13 +1,13 @@
 namespace Vls
 {
-  public class AbstractJsonSerializableObject : GLib.Object, Json.Serializable
+  public class AbstractJsonSerializableObject : GLib.Object, JsonSerializableObject
   {
     protected virtual bool serialize_nulls()
     {
       return false;
     }
 
-    public virtual Json.Node serialize_property(string property_name, Value value, ParamSpec pspec)
+    public virtual Json.Node? serialize_property(string property_name, Value value, ParamSpec pspec)
     {
       // Serialize primitive types explicitly otherwise zero values are ignored for some reason...
       if (pspec.value_type.is_a(typeof(int)))
@@ -55,7 +55,7 @@ namespace Vls
       return default_serialize_property(property_name, value, pspec);
     }
 
-    public virtual bool deserialize_property(string property_name, out Value value, ParamSpec pspec, Json.Node property_node)
+    public virtual bool deserialize_property(string property_name, ref Value value, ParamSpec pspec, Json.Node property_node)
     {
       if (pspec.value_type.is_a(typeof(JsonSerializableValue)))
       {
@@ -70,7 +70,7 @@ namespace Vls
         }
       }
 
-      return default_deserialize_property(property_name, out value, pspec, property_node);
+      return default_deserialize_property(property_name, ref value, pspec, property_node);
     }
 
     private JsonSerializableValue? create_value(Type value_type, string property_name)
